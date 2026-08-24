@@ -1,0 +1,78 @@
+---
+import { Image } from 'astro:assets';
+import aodes from '../assets/images/partners/aodes.png';
+import baltmotors from '../assets/images/partners/baltmotors.png';
+import gladiator from '../assets/images/partners/gladiator.png';
+import golfstream from '../assets/images/partners/golfstream.png';
+import motul from '../assets/images/partners/motul.jpg';
+import ngk from '../assets/images/partners/ngk.jpg';
+import parsun from '../assets/images/partners/parsun.png';
+import seaPro from '../assets/images/partners/sea-pro.jpg';
+import segway from '../assets/images/partners/segway.png';
+import stels from '../assets/images/partners/stels.jpg';
+
+const partners = [
+  { src: aodes, alt: 'AODES', link: '#' },
+  { src: baltmotors, alt: 'Baltmotors', link: '#' },
+  { src: gladiator, alt: 'Gladiator', link: '#' },
+  { src: golfstream, alt: 'Golfstream', link: '#' },
+  { src: motul, alt: 'Motul', link: '#' },
+  { src: ngk, alt: 'NGK', link: '#' },
+  { src: parsun, alt: 'PARSUN', link: '#' },
+  { src: seaPro, alt: 'Sea-Pro', link: '#' },
+  { src: segway, alt: 'SEGWAY', link: '#' },
+  { src: stels, alt: 'STELS', link: '#' },
+];
+---
+
+<section class="partners">
+  <div class="partners__container">
+    {partners.map((partner) => (
+      <a href={partner.link} class="partner-item" target="_blank" rel="noopener">
+        <Image
+          src={partner.src}
+          alt={partner.alt}
+          width={160}
+          height={90}
+          fit="fill"        /* ← теперь можно fill, потому что все логотипы ровно 160x90 */
+          loading="lazy"
+        />
+      </a>
+    ))}
+  </div>
+</section>
+
+<style>
+  .partners {
+    background: #fff;
+    padding: 2rem 1rem;
+  }
+
+  .partners__container {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: 2rem;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  .partner-item {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 160px;   /* вернули фиксированный размер, т.к. fill работает чётко */
+    height: 90px;
+    transition: opacity 0.2s;
+  }
+
+  .partner-item:hover {
+    opacity: 0.7;
+  }
+
+  /* на всякий случай убираем любые фоны */
+  .partner-item img {
+    background: transparent;
+  }
+</style>

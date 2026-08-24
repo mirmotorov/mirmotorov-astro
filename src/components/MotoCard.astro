@@ -1,0 +1,43 @@
+---
+import { productUrl } from '../utils/transliterate';
+
+const { moto } = Astro.props;
+const firstPhoto = moto.photo && moto.photo.length > 0 ? moto.photo[0] : '/placeholder.jpg';
+const priceString = moto.price > 0 ? moto.price.toLocaleString() + ' ₽' : 'Цена по запросу';
+---
+<a href={productUrl(moto)} class="moto-card">
+  <img src={firstPhoto} alt={moto.title} />
+  <h3>{moto.title}</h3>
+  <p class="price">{priceString}</p>
+  {moto.oldPrice && <p class="old-price"><s>{moto.oldPrice.toLocaleString()} ₽</s></p>}
+</a>
+
+<style>
+  .moto-card {
+    background: white;
+    border-radius: 8px;
+    overflow: hidden;
+    text-decoration: none;
+    color: inherit;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    transition: transform 0.2s;
+  }
+  .moto-card:hover {
+    transform: translateY(-4px);
+  }
+  img {
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
+    background: #eee;
+  }
+  h3 {
+    margin: 0.8rem;
+    font-size: 1rem;
+  }
+  .price {
+    margin: 0 0.8rem 1rem;
+    font-weight: bold;
+    color: #e63946;
+  }
+</style>

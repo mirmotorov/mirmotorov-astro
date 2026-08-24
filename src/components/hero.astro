@@ -1,0 +1,24 @@
+---
+import hero from '../data/hero.json';
+---
+<section class="hero">
+  <div class="hero-content">
+    <h1>{hero.heading}</h1>
+    <p>{hero.subheading}</p>
+    <a href={hero.buttonLink}>{hero.buttonText}</a>
+  </div>
+</section>
+
+<style>
+.hero {
+  background: #333;
+  color: white;
+  padding: 4rem 2rem;
+  text-align: center;
+}
+.hero h1 { font-size: 3rem; }
+.hero p { font-size: 1.2rem; }
+.hero a {
+  display: inline-block; padding: 0.8em 1.5em; background: #e63946; color: white; text-decoration: none; border-radius: 5px; margin-top: 1rem;
+}
+</style>

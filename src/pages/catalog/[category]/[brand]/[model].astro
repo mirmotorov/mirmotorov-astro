@@ -1,0 +1,107 @@
+---
+import Layout from '../../../../layouts/Layout.astro';
+import products from '../../../../data/products.json';
+import { categoryToSlug, getMainCategory } from '../../../../utils/transliterate';
+
+export function getStaticPaths() {
+  return products
+    .filter((p) => p.brandSlug && p.modelSlug && p.category)
+    .map((product) => ({
+      params: {
+        category: categoryToSlug(product.category),
+        brand: product.brandSlug,
+        model: product.modelSlug,
+      },
+      props: { product },
+    }));
+}
+
+const { product } = Astro.props;
+const categorySlug = categoryToSlug(product.category);
+const categoryTitle = getMainCategory(product.category);
+const pageTitle = product.seo?.title || product.title;
+---
+
+<Layout title={pageTitle}>
+  <nav class="breadcrumb">
+    <a href="/catalog">Каталог</a> /
+    <a href={`/catalog/${categorySlug}`}>{categoryTitle}</a> /
+    <a href={`/catalog/${categorySlug}/${product.brandSlug}`}>{product.brandSlug}</a> /
+    <span>{product.title}</span>
+  </nav>
+
+  <div class="product-page">
+    <div class="gallery">
+      {product.photo.length > 0 ? (
+        product.photo.map((src) => (
+          <img src={src.trim()} alt={product.title} />
+        ))
+      ) : (
+        <img src="/placeholder.jpg" alt={product.title} />
+      )}
+    </div>
+    <div class="info">
+      <h1>{product.title}</h1>
+      <div class="prices">
+        <span class="price">{product.price.toLocaleString()} ₽</span>
+        {product.oldPrice && (
+          <span class="old-price">{product.oldPrice.toLocaleString()} ₽</span>
+        )}
+      </div>
+      {product.description && <p>{product.description}</p>}
+      <button class="btn-contact" id="contact-btn">Связаться со мной</button>
+    </div>
+  </div>
+
+  <div id="contact-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+      <span class="close">&times;</span>
+      <h2>Заявка на {product.title}</h2>
+      <form id="contact-form">
+        <input type="text" name="name" placeholder="Ваше имя" required />
+        <input type="tel" name="phone" placeholder="Телефон" required />
+        <textarea name="comment" placeholder="Комментарий (необязательно)"></textarea>
+        <button type="submit">Отправить</button>
+      </form>
+    </div>
+  </div>
+</Layout>
+
+<style>
+  .breadcrumb { padding: 1rem; color: #666; font-size: 0.9rem; max-width: 1200px; margin: 0 auto; }
+  .breadcrumb a { color: #333; }
+  .product-page { display: flex; flex-wrap: wrap; gap: 2rem; max-width: 1200px; margin: 2rem auto; padding: 0 20px; }
+  .gallery { flex: 1 1 400px; }
+  .gallery img { width: 100%; border-radius: 8px; margin-bottom: 0.5rem; background: #eee; }
+  .info { flex: 1 1 300px; }
+  .price { font-size: 2rem; font-weight: bold; color: #e63946; }
+  .old-price { text-decoration: line-through; color: #888; margin-left: 0.5rem; }
+  .btn-contact { margin-top: 2rem; padding: 0.8em 2em; background: #e63946; color: white; border: none; border-radius: 5px; cursor: pointer; }
+  .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+  .modal-content { background: white; padding: 2rem; border-radius: 10px; width: 90%; max-width: 400px; position: relative; }
+  .close { position: absolute; top: 10px; right: 15px; font-size: 1.5rem; cursor: pointer; color: #888; }
+  .modal input, .modal textarea { width: 100%; margin-bottom: 1rem; padding: 0.5rem; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; }
+  .modal button[type="submit"] { background: #e63946; color: white; border: none; padding: 0.7rem 1.5rem; border-radius: 5px; cursor: pointer; }
+</style>
+
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const btn = document.getElementById('contact-btn');
+    const modal = document.getElementById('contact-modal');
+    if (!btn || !modal) return;
+
+    const close = modal.querySelector('.close');
+    const form = document.getElementById('contact-form');
+
+    btn.addEventListener('click', () => { modal.style.display = 'flex'; });
+    close?.addEventListener('click', () => { modal.style.display = 'none'; });
+    window.addEventListener('click', (e) => {
+      if (e.target === modal) modal.style.display = 'none';
+    });
+    form?.addEventListener('submit', (e) => {
+      e.preventDefault();
+      alert('Спасибо! Мы свяжемся с вами.');
+      modal.style.display = 'none';
+    });
+  });
+</script>

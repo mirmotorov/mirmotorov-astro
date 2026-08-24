@@ -1,0 +1,44 @@
+[
+  {
+    "slug": "honda-cbr650r",
+    "title": "Honda CBR650R",
+    "price": 850000,
+    "image": "/images/placeholder.jpg",
+    "category": "sport"
+  },
+  {
+    "slug": "yamaha-mt07",
+    "title": "Yamaha MT-07",
+    "price": 720000,
+    "image": "/images/placeholder.jpg",
+    "category": "naked"
+  },
+  {
+    "slug": "kawasaki-z900",
+    "title": "Kawasaki Z900",
+    "price": 890000,
+    "image": "/images/placeholder.jpg",
+    "category": "naked"
+  },
+  {
+    "slug": "suzuki-rmz250",
+    "title": "Suzuki RM-Z250",
+    "price": 620000,
+    "image": "/images/placeholder.jpg",
+    "category": "cross"
+  },
+  {
+    "slug": "cfmoto-800mt",
+    "title": "CFMOTO 800MT",
+    "price": 780000,
+    "image": "/images/placeholder.jpg",
+    "category": "tourist"
+  },
+  {
+    "slug": "aodes-trx250",
+    "title": "AODES TRX250",
+    "price": 350000,
+    "image": "/images/placeholder.jpg",
+    "category": "quad"
+  }
+]

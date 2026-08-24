@@ -1,0 +1,143 @@
+---
+import { Image } from 'astro:assets';
+import banner1 from '../assets/images/banners/5.jpg';
+import banner2 from '../assets/images/banners/5.jpg';
+import banner3 from '../assets/images/banners/5.jpg';
+
+const banners = [
+  { src: banner1, link: '/promos/action1' },
+  { src: banner2, link: '/promos/action2' },
+  { src: banner3, link: '/promos/action3' },
+];
+---
+
+<div class="slider-container">
+  <div class="hero-slider" id="hero-slider">
+    {banners.map((banner, index) => (
+      <a href={banner.link} class="slide">
+        <Image
+          src={banner.src}
+          alt=""
+          width={1400}
+          height={600}
+          fit="fill"
+          loading="eager"
+          class="slide-image"
+        />
+      </a>
+    ))}
+    <button class="slider-btn prev" aria-label="Предыдущий баннер">&#10094;</button>
+    <button class="slider-btn next" aria-label="Следующий баннер">&#10095;</button>
+  </div>
+</div>
+
+<style>
+  .slider-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0 20px;
+  }
+
+  .hero-slider {
+    position: relative;
+    width: 100%;
+    height: 60vh;
+    min-height: 400px;
+    overflow: hidden;
+    border-radius: 0 0 8px 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  }
+
+  .slide {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: none;
+    text-decoration: none;
+  }
+
+  .slide.active {
+    display: block;
+  }
+
+  .slide-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;   /* гарантирует заполнение без искажений, дополняет fill */
+  }
+
+  .slider-btn {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(0, 0, 0, 0.4);
+    color: white;
+    border: none;
+    font-size: 2rem;
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+    z-index: 5;
+    transition: background 0.2s;
+  }
+
+  .slider-btn:hover {
+    background: rgba(0, 0, 0, 0.7);
+  }
+
+  .prev { left: 10px; }
+  .next { right: 10px; }
+</style>
+
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const slides = document.querySelectorAll('.hero-slider .slide');
+    if (slides.length === 0) return;
+
+    let current = 0;
+    let interval;
+
+    function showSlide(index) {
+      slides.forEach((s, i) => s.classList.toggle('active', i === index));
+    }
+
+    function nextSlide() {
+      current = (current + 1) % slides.length;
+      showSlide(current);
+    }
+
+    function prevSlide() {
+      current = (current - 1 + slides.length) % slides.length;
+      showSlide(current);
+    }
+
+    function startAuto() {
+      stopAuto();
+      interval = setInterval(nextSlide, 10000);
+    }
+
+    function stopAuto() {
+      clearInterval(interval);
+    }
+
+    document.querySelector('.prev').addEventListener('click', () => {
+      prevSlide();
+      stopAuto();
+      startAuto();
+    });
+
+    document.querySelector('.next').addEventListener('click', () => {
+      nextSlide();
+      stopAuto();
+      startAuto();
+    });
+
+    const slider = document.getElementById('hero-slider');
+    slider.addEventListener('mouseenter', stopAuto);
+    slider.addEventListener('mouseleave', startAuto);
+
+    showSlide(0);
+    startAuto();
+  });
+</script>

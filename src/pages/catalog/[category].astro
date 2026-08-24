@@ -1,0 +1,56 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import products from '../../data/products.json';
+import { categoryToSlug, getMainCategory } from '../../utils/transliterate';
+
+export function getStaticPaths() {
+  const mainCategories = [...new Set(products.map(p => getMainCategory(p.category)).filter(Boolean))];
+  console.log('Категории для генерации:', mainCategories); // ← добавьте эту строку
+  return mainCategories.map(cat => ({
+    params: { category: categoryToSlug(cat) },
+    props: { category: cat }
+  }));
+}
+
+const { category } = Astro.props;
+
+const productsInCategory = products.filter(p => getMainCategory(p.category) === category);
+
+const brandSlugs = [...new Set(productsInCategory.map(p => p.brandSlug).filter(Boolean))];
+const brandsInCategory = brandSlugs.map(slug => {
+  const found = productsInCategory.find(p => p.brandSlug === slug);
+  const title = found
+    ? (found.category?.split('>>>')[1]?.split(';')[0]?.trim() || found.brand || 'Бренд')
+    : slug;
+  return { title, slug };
+});
+---
+
+<Layout title={category}>
+  <h1>{category}</h1>
+  <p>Выберите бренд:</p>
+  <div class="brands-grid">
+    {brandsInCategory.length > 0 ? (
+      brandsInCategory.map(brand => (
+        <a href={`/catalog/${categoryToSlug(category)}/${brand.slug}`} class="brand-card">
+          {brand.title}
+        </a>
+      ))
+    ) : (
+      <p>В этой категории пока нет товаров.</p>
+    )}
+  </div>
+</Layout>
+
+<style>
+  .brands-grid { display: flex; flex-wrap: wrap; gap: 1rem; padding: 1rem; }
+  .brand-card {
+    padding: 1rem 2rem;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    text-decoration: none;
+    color: #333;
+    transition: background 0.2s;
+  }
+  .brand-card:hover { background: #f5f5f5; }
+</style>

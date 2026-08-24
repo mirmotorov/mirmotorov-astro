@@ -1,0 +1,10 @@
+[
+  { "title": "Квадроциклы", "slug": "kvadrocikly", "image": "/images/aodes-1000-mp-2026.jpg" },
+  { "title": "Снегоходы", "slug": "snegohody", "image": "/images/aodes-snowcross-900-1.jpg" },
+  { "title": "Лодочные моторы", "slug": "lodochnye-motory", "image": "/images/lodochnye-motory-parsun-f20fes-t-efi.jpg" },
+  { "title": "Лодки", "slug": "lodki", "image": "/images/boat-gladiator.jpg" },
+  { "title": "Аксессуары", "slug": "aksessuary", "image": "/images/gusenica-na-snegohodi.jpg" },
+  { "title": "Экипировка", "slug": "ekipirovka", "image": "/images/shlem-fxr-clutch-evo-hi-vis-blue-1000x1000.jpg" },
+  { "title": "Запчасти", "slug": "zapchasti", "image": "/images/atv.jpg" },
+  { "title": "Сервис", "slug": "service", "image": "/images/aodes-1000-mp-2026.jpg" }
+]

@@ -1,0 +1,97 @@
+---
+import Layout from '../../../layouts/Layout.astro';
+import products from '../../../data/products.json';
+import { categoryToSlug } from '../../../utils/transliterate';
+
+export function getStaticPaths() {
+  const paths = products
+    .filter((p) => p.brandSlug && p.category)
+    .map((p) => ({
+      params: {
+        category: categoryToSlug(p.category),
+        brand: p.brandSlug,
+      },
+      props: {
+        categoryTitle: p.category?.split('>>>')[0]?.trim() ?? '',
+        categorySlug: categoryToSlug(p.category),
+        brand: p.brandSlug,
+      },
+    }));
+
+  return paths.filter(
+    (v, i, a) =>
+      a.findIndex(
+        (t) => t.params.category === v.params.category && t.params.brand === v.params.brand,
+      ) === i,
+  );
+}
+
+const { categoryTitle, categorySlug, brand } = Astro.props;
+
+const brandProducts = products.filter(
+  (p) => categoryToSlug(p.category) === categorySlug && p.brandSlug === brand,
+);
+
+const priceRanges = [
+  { label: 'Все', value: '' },
+  { label: 'до 500 000 ₽', value: '0-500000' },
+  { label: '500 000 – 1 000 000 ₽', value: '500000-1000000' },
+  { label: 'от 1 000 000 ₽', value: '1000000-' },
+];
+
+const currentPrice = Astro.url.searchParams.get('price') || '';
+let filtered = brandProducts;
+if (currentPrice) {
+  const [min, max] = currentPrice.split('-').map(Number);
+  filtered = brandProducts.filter((p) => {
+    if (currentPrice.endsWith('-')) return p.price >= min;
+    if (currentPrice.startsWith('-')) return p.price <= max;
+    return p.price >= min && p.price <= max;
+  });
+}
+---
+
+<Layout title={`${categoryTitle} — ${brand}`}>
+  <nav class="breadcrumb">
+    <a href="/catalog">Каталог</a> /
+    <a href={`/catalog/${categorySlug}`}>{categoryTitle}</a> /
+    <span>{brand}</span>
+  </nav>
+
+  <h1>{brand}</h1>
+
+  <div class="filters">
+    {priceRanges.map((range) => (
+      <a href={`?price=${range.value}`} class={range.value === currentPrice ? 'active' : ''}>
+        {range.label}
+      </a>
+    ))}
+  </div>
+
+  <div class="grid">
+    {filtered.map((product) => (
+      <a
+        href={`/catalog/${categorySlug}/${product.brandSlug}/${product.modelSlug}`}
+        class="card"
+      >
+        <img src={product.photo[0] || '/placeholder.jpg'} alt={product.title} />
+        <h3>{product.title}</h3>
+        <span class="price">{product.price.toLocaleString()} ₽</span>
+      </a>
+    ))}
+  </div>
+</Layout>
+
+<style>
+  .breadcrumb { padding: 1rem; color: #666; font-size: 0.9rem; }
+  .breadcrumb a { color: #333; }
+  .filters { display: flex; gap: 1rem; padding: 1rem; flex-wrap: wrap; }
+  .filters a { padding: 0.5rem 1rem; border: 1px solid #ddd; border-radius: 6px; text-decoration: none; color: #333; }
+  .filters a.active { background: #e63946; color: white; border-color: #e63946; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 1.5rem; padding: 1rem; }
+  .card { border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); text-decoration: none; color: inherit; transition: transform 0.2s; }
+  .card:hover { transform: translateY(-4px); }
+  .card img { width: 100%; height: 200px; object-fit: cover; background: #eee; }
+  .card h3 { margin: 0.5rem; font-size: 1rem; }
+  .price { font-weight: bold; color: #e63946; margin: 0.5rem; display: block; }
+</style>
