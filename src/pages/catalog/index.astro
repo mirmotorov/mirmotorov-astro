@@ -1,0 +1,188 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import categories from '../../data/categories.json';
+import { categoryToSlug } from '../../utils/transliterate';
+
+// ──────────────────────────────────────────────────────────────────────────
+//  ⭐⭐⭐ ТОЧНО ТАК ЖЕ КАК CategoryCards.astro — ОНИ РАБОТАЮТ НА ГЛАВНОЙ!
+// ──────────────────────────────────────────────────────────────────────────
+const catImages = import.meta.glob('/src/assets/images/categories/*.{jpg,jpeg,png,webp}', {
+  eager: true,
+  import: 'default',
+}) as Record<string, any>;
+
+function findCatImg(slug: string, title: string): any | null {
+  const slugLow = (slug || '').toLowerCase();
+  const titleLow = (title || '').toLowerCase();
+  for (const [p, img] of Object.entries(catImages)) {
+    const lc = p.toLowerCase();
+    if (lc.includes(slugLow)) return img;
+  }
+  for (const [p, img] of Object.entries(catImages)) {
+    const lc = p.toLowerCase();
+    if (titleLow && lc.includes(titleLow.slice(0, 8))) return img;
+  }
+  return null;
+}
+
+const CATEGORY_OVERRIDES: Record<string, string> = {
+  zapchasti:   '/parts',
+  aksessuary:  '/catalog-aksessuary',
+  ekipirovka:  '/odezhda-i-ehkipirovka',
+  service:     '/service',
+};
+
+const list = categories.map((cat: any) => {
+  const slug = cat.slug || categoryToSlug(cat.title);
+  const href = CATEGORY_OVERRIDES[slug] || `/catalog/${slug}`;
+  return { ...cat, slug, href, image: findCatImg(slug, cat.title) || null };
+});
+
+const seoTitle = 'Каталог мототехники Мир Моторов 24 — Красноярск';
+const seoDescr = 'Квадроциклы AODES, Segway, STELS, Tinger. Снегоходы, лодки, лодочные моторы Parsun, Gladiator, Golfstream. Официальный дилер, гарантия. Купить с доставкой по РФ.';
+---
+
+<Layout title={seoTitle} description={seoDescr} heroTitle="🛒 Каталог мототехники" heroSubtitle="8 категорий: Квадроциклы, Снегоходы, Лодки, Моторы, Запчасти, Аксессуары, Экипировка, Сервис. Оригиналы с гарантией.">
+  <div class="wrap">
+    <!-- Хлебные крошки -->
+    <nav class="crumbs">
+      <a href="/">Главная</a> / <span>Каталог</span>
+    </nav>
+
+    <h1 class="title">Вся мототехника — в наличии и под заказ</h1>
+    <p class="sub">Выберите категорию, чтобы посмотреть модели, цены и характеристики:</p>
+
+    <div class="grid">
+      {list.map((cat) => (
+        <a href={cat.href} class="card" key={cat.slug}>
+          <div class="card-img">
+            {cat.image ? (
+              <img
+                src={typeof cat.image === 'string' ? cat.image : cat.image.src}
+                alt={cat.title}
+                loading="lazy"
+                decoding="async"
+              />
+            ) : (
+              <div class="plug">
+                <span>{cat.emoji || '🚜'}</span>
+                <small>Нет картинки для: <code>{cat.slug}</code></small>
+              </div>
+            )}
+          </div>
+          <div class="card-body">
+            <h3>{cat.title}</h3>
+            {cat.desc && <p>{cat.desc}</p>}
+            <span class="more">Открыть раздел →</span>
+          </div>
+        </a>
+      ))}
+    </div>
+  </div>
+</Layout>
+
+<style>
+/* ╔═════════════════════════════════════════════════════════════════╗
+   ║  🔧🔧🔧   ВСЕ НАСТРОЙКИ РАЗМЕРОВ — ИЗМЕНЯЙТЕ ЦИФРЫ ЗДЕСЬ   🔧🔧🔧
+   ╚═════════════════════════════════════════════════════════════════╝*/
+
+.wrap {
+  max-width: 1200px;   /* 👈 ШИРИНА ВСЕЙ СТРАНИЦЫ (как хедер). 1200 = уже. Сделать больше — 1400. */
+  margin: 0 auto;
+  padding: 1.25rem 20px 3.5rem;
+  box-sizing: border-box;
+  background: #ffffff;   /* 👈 ⭐ УБИРАЕТ ЖЕЛТЫЙ ФОН под сеткой (если наследуется желтый от layout) */
+}
+
+/* Сколько в ряду: 4=мелко, 3=средне, 2=огромно */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr );  /* 👈 3 В РЯД */
+  gap: 1.8rem;                             /* 👈 ОТСТУП МЕЖДУ КАРТОЧКАМИ */
+  margin: 2.2rem 0 3rem;
+}
+@media (max-width: 1024px) { .grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 600px)  { .grid { grid-template-columns: 1fr; } }
+
+/* Карточка */
+.card {
+  background: #fff;
+  border: 1px solid #eef0f3;
+  border-radius: 16px;
+  overflow: hidden;
+  text-decoration: none;
+  color: inherit;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+  transition: transform 0.25s, box-shadow 0.25s;
+  display: flex;
+  flex-direction: column;
+  height: 100%;   /* 👈 ⭐ ФИКС #1: ВСЕ КАРТОЧКИ ОДИНАКОВОЙ ВЫСОТЫ В РЯДУ */
+}
+.card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 24px 55px rgba(0,0,0,0.16);
+  border-color: #fcd34d;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   ⚠️ ВСЕ 8 КАРТИНОК — ОДИНАКОВОЙ ВЫСОТЫ (ЗАГОЛОВКИ НА ОДНОЙ ЛИНИИ!)
+   aspect-ratio задает форму рамки. Меняйте цифры по вкусу:
+   4 / 3 = классика (как сейчас)
+   16 / 10 = шире
+   3 / 2 = еще шире
+   1 / 1 = квадрат
+   ════════════════════════════════════════════════════════════════ */
+.card-img {
+  width: 100%;
+  background: #ffffff;      /* 👈 ⭐ Фиксированный белый фон под картинкой */
+  padding: 10px;            /* 👈 ОТСТУП ВОКРУГ КАРТИНКИ. 0 = убрать белое поле */
+  overflow: hidden;
+  /* ⭐⭐⭐ ФИКС ВЫСОТЫ — ВСЕ КАРТОЧКИ ОДИНАКОВЫ ⭐⭐⭐ */
+  aspect-ratio: 4 / 3;      /* 👈 👈 👈 МЕНЯТЬ СООТНОШЕНИЕ СТОРОН ЗДЕСЬ. 4/3 = все картинки впишутся в прямоугольник 4×3 */
+  display: flex;
+  align-items: center;      /* центрируем по вертикали */
+  justify-content: center;  /* центрируем по горизонтали */
+}
+.card-img img {
+  display: block;
+  width: auto;             /* 👈 ширина не 100% — сама подбирается */
+  height: auto;            /* 👈 высота не auto — сама подбирается */
+  max-width: 100%;         /* но не больше ширины рамки */
+  max-height: 100%;        /* и не больше высоты рамки */
+  border-radius: 8px;
+  transition: transform 0.35s;
+}
+.card:hover .card-img img { transform: scale(1.05); }
+
+/* Заглушка если нет картинки — ТОЖЕ САМАЯ ВЫСОТА! */
+.plug {
+  width: 100%;
+  height: 100%;            /* 👈 ⭐ ТАКАЯ ЖЕ ВЫСОТА, КАК И У КАРТИНКИ */
+  aspect-ratio: 4 / 3;     /* 👈 ТО ЖЕ САМОЕ СООТНОШЕНИЕ */
+  background: linear-gradient(135deg, #fff7ed 0%, #fef3c7 100%);
+  border-radius: 8px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 0.8rem; padding: 1rem; text-align: center; color: #92400e;
+  box-sizing: border-box;
+}
+.plug span { font-size: 3.8rem; line-height: 1; }
+.plug small { font-size: 0.8rem; }
+
+/* Текстовая часть */
+.card-body {
+  padding: 0.9rem 1.15rem 1.15rem;   /* 👈 Меньше отступы внутри текста (было 1.1rem 1.5rem 1.6rem) */
+  border-top: 1px solid #f1f3f6;
+  display: flex; flex-direction: column; gap: 0.35rem; flex: 1;
+}
+.card-body h3 { margin: 0; font-size: 1.05rem; font-weight: 800; }    /* 👈 Заголовок меньше (было 1.2rem) */
+.card-body p  { margin: 0; font-size: 0.82rem; color: #6b7280; line-height: 1.4; }  /* 👈 Описание меньше */
+.more { margin-top: auto; padding-top: 0.3rem; font-weight: 700; color: #f59e0b; font-size: 0.85rem; }   /* 👈 «Перейти...» меньше */
+.card:hover .more { color: #b45309; }
+
+/* Заголовки */
+.crumbs { color: #6b7280; font-size: 0.85rem; margin-bottom: 0.9rem; }
+.crumbs a { color: #374151; text-decoration: none; }
+.crumbs a:hover { color: #f59e0b; }
+.title { margin: 0 0 0.4rem; font-size: clamp(1.7rem, 2.8vw, 2.3rem); font-weight: 900; letter-spacing: -0.025em; color: #111827; }
+.sub { margin: 0 0 0.3rem; color: #6b7280; font-size: 1rem; }
+</style>

@@ -1,22 +1,34 @@
 ---
 import Layout from '../../../layouts/Layout.astro';
-import products from '../../../data/products.json';
-import { categoryToSlug } from '../../../utils/transliterate';
+import { Image } from 'astro:assets';
+import { getAllProducts, getProductsByBrand } from '../../../utils/load-products';
+import { getProductImage } from '../../../utils/image-loader';
+import { categoryToSlug, getMainCategory } from '../../../utils/transliterate';
 
 export function getStaticPaths() {
-  const paths = products
+  const all = getAllProducts();
+  const paths = all
     .filter((p) => p.brandSlug && p.category)
-    .map((p) => ({
-      params: {
-        category: categoryToSlug(p.category),
-        brand: p.brandSlug,
-      },
-      props: {
-        categoryTitle: p.category?.split('>>>')[0]?.trim() ?? '',
-        categorySlug: categoryToSlug(p.category),
-        brand: p.brandSlug,
-      },
-    }));
+    .map((p) => {
+      const parts = (p.category || '').split('>>>');
+      const brandFull = parts[1]?.split(';')[0]?.trim() || p.brand || '';
+      const mainCat = getMainCategory(p.category) || parts[0]?.trim() || '';
+      return {
+        params: {
+          category: categoryToSlug(p.category),
+          brand: p.brandSlug,
+        },
+        props: {
+          mainCatTitle: mainCat,
+          mainCatSlug: categoryToSlug(mainCat),
+          categoryTitle: parts[0]?.trim() ?? '',
+          categorySlug: categoryToSlug(p.category),
+          brandSlug: p.brandSlug,
+          brandTitle: brandFull || p.brandSlug,
+          brandName: p.brand || brandFull || p.brandSlug,
+        },
+      };
+    });
 
   return paths.filter(
     (v, i, a) =>
@@ -26,72 +38,529 @@ export function getStaticPaths() {
   );
 }
 
-const { categoryTitle, categorySlug, brand } = Astro.props;
+// ============ PROPS ============
+const {
+  mainCatTitle,
+  mainCatSlug,
+  categoryTitle,
+  categorySlug,
+  brandSlug,
+  brandTitle,
+  brandName,
+} = Astro.props;
 
-const brandProducts = products.filter(
-  (p) => categoryToSlug(p.category) === categorySlug && p.brandSlug === brand,
-);
+const brandProducts = getProductsByBrand(mainCatSlug, brandSlug) || [];
+const firstProduct = brandProducts[0];
+const heroImg = firstProduct?.photo?.[0] ? getProductImage(firstProduct.photo[0], 'technique') : null;
+const isTall = mainCatSlug === 'lodochnye-motory';
 
+const minPrice = brandProducts.length ? Math.min(...brandProducts.map((p: any) => p.price || Infinity)) : 0;
+const maxPrice = brandProducts.length ? Math.max(...brandProducts.map((p: any) => p.price || 0)) : 0;
+const subtitle = `${brandProducts.length} ${brandProducts.length === 1 ? 'модель' : brandProducts.length < 5 ? 'модели' : 'моделей'} ${brandName} в наличии. Цены от ${minPrice.toLocaleString()} ₽.`;
+
+// ============ ФИЛЬТРЫ: КОНФИГУРАЦИЯ ПО КАТЕГОРИЯМ ============
 const priceRanges = [
-  { label: 'Все', value: '' },
-  { label: 'до 500 000 ₽', value: '0-500000' },
-  { label: '500 000 – 1 000 000 ₽', value: '500000-1000000' },
-  { label: 'от 1 000 000 ₽', value: '1000000-' },
+  { label: 'Все цены', v: '' },
+  { label: 'до 250 000 ₽', v: '0-250000' },
+  { label: '250 – 500 тыс ₽', v: '250000-500000' },
+  { label: '500 – 750 тыс ₽', v: '500000-750000' },
+  { label: '750 тыс – 1 млн ₽', v: '750000-1000000' },
+  { label: '1 – 1,5 млн ₽', v: '1000000-1500000' },
+  { label: '1,5 – 2 млн ₽', v: '1500000-2000000' },
+  { label: '2 – 3 млн ₽', v: '2000000-3000000' },
+  { label: 'от 3 млн ₽', v: '3000000-' },
 ];
 
-const currentPrice = Astro.url.searchParams.get('price') || '';
-let filtered = brandProducts;
-if (currentPrice) {
-  const [min, max] = currentPrice.split('-').map(Number);
-  filtered = brandProducts.filter((p) => {
-    if (currentPrice.endsWith('-')) return p.price >= min;
-    if (currentPrice.startsWith('-')) return p.price <= max;
-    return p.price >= min && p.price <= max;
-  });
+// === Квадроциклы: по кубатуре ===
+const ccRanges = [
+  { label: 'Все кубатуры', v: '' },
+  { label: 'до 325 куб.см', v: '0-325' },
+  { label: '350 – 625 куб.см', v: '350-625' },
+  { label: '650 куб.см', v: '650-650' },
+  { label: '800 – 850 куб.см', v: '800-850' },
+  { label: 'от 1000 куб.см', v: '1000-' },
+];
+
+// === Лодочные моторы ===
+const tactFilters = [{ label: 'Тактность (все)', v: '' }, { label: '2-тактный', v: '2' }, { label: '4-тактный', v: '4' }];
+const powerRanges = [
+  { label: 'Мощность (все)', v: '' },
+  { label: 'до 5 л.с.', v: '0-5' },
+  { label: '6 – 9,8 л.с.', v: '6-9.8' },
+  { label: '9,9 – 20 л.с.', v: '9.9-20' },
+  { label: '25 – 30 л.с.', v: '25-30' },
+  { label: '40 – 60 л.с.', v: '40-60' },
+  { label: '70 – 130 л.с.', v: '70-130' },
+  { label: '150 – 249 л.с.', v: '150-249' },
+  { label: 'от 250 л.с.', v: '250-' },
+];
+const controlFilters = [{ label: 'Управление (все)', v: '' }, { label: 'Румпель', v: 'rumpel' }, { label: 'Дистанция', v: 'distance' }];
+const propulsionFilters = [{ label: 'Движитель (все)', v: '' }, { label: 'Винтовой', v: 'screw' }, { label: 'Джет (водомет)', v: 'jet' }];
+
+// === Снегоходы ===
+const trackFilters = [{ label: 'Ширина гусеницы (все)', v: '' }, { label: 'до 508 мм', v: '0-508' }, { label: 'от 509 мм', v: '509-' }];
+
+// === Лодки ===
+const boatTypeFilters = [{ label: 'Тип лодки (все)', v: '' }, { label: 'Килевая', v: 'kilevaya' }, { label: 'Тоннельная', v: 'tonnelnaya' }, { label: 'RIB (жесткий корпус)', v: 'rib' }];
+const floorTypeFilters = [{ label: 'Тип днища (все)', v: '' }, { label: 'Фанерная слань', v: 'fanera' }, { label: 'Алюминиевая слань', v: 'aluminum' }, { label: 'Надувное дно (AirDeck)', v: 'air' }];
+
+// ============ ЧТЕНИЕ URL ПАРАМЕТРОВ ============
+const p = Astro.url.searchParams;
+const qpPrice = p.get('price') || '';
+const qpCC = p.get('cc') || '';
+const qpTact = p.get('tact') || '';
+const qpPower = p.get('power') || '';
+const qpControl = p.get('ctl') || '';
+const qpPropulsion = p.get('prop') || '';
+const qpTrack = p.get('track') || '';
+const qpBoatType = p.get('bt') || '';
+const qpFloorType = p.get('ft') || '';
+
+// Вспомогательная функция фильтра по диапазону (строка "min-max" или "min-" или "-max")
+function inRange(val: number | undefined, range: string): boolean {
+  if (!range) return true;
+  if (val === undefined || val === null) return false;
+  if (range.startsWith('-')) return val <= parseFloat(range.slice(1));
+  if (range.endsWith('-')) return val >= parseFloat(range.slice(0, -1));
+  const [a, b] = range.split('-').map(parseFloat);
+  return val >= a && val <= b;
 }
+
+// Нормализация значений фильтров (поддержка русских и англ названий)
+function normTact(s: string): string | undefined {
+  if (!s) return undefined;
+  const x = String(s).toLowerCase().replace(/[^a-zа-я0-9]/g,'');
+  if (x === '2' || x.startsWith('2такт') || x === 'two') return '2';
+  if (x === '4' || x.startsWith('4такт') || x === 'four') return '4';
+  return undefined;
+}
+function normControl(s: string): string | undefined {
+  if (!s) return undefined;
+  const x = String(s).toLowerCase().replace(/[^a-zа-я]/g,'');
+  if (x.startsWith('rum') || x.startsWith('румп')) return 'rumpel';
+  if (x.startsWith('dist') || x.startsWith('дист') || x.startsWith('пульт')) return 'distance';
+  return undefined;
+}
+function normPropulsion(s: string): string | undefined {
+  if (!s) return undefined;
+  const x = String(s).toLowerCase().replace(/[^a-zа-я]/g,'');
+  if (x.startsWith('vint') || x.startsWith('винт') || x === 'screw') return 'screw';
+  if (x.startsWith('jet') || x.startsWith('дж') || x.startsWith('водом')) return 'jet';
+  return undefined;
+}
+function normBoatType(s: string): string | undefined {
+  if (!s) return undefined;
+  const x = String(s).toLowerCase().replace(/[^a-zа-я0-9]/g,'');
+  if (x.includes('кил') || x === 'kilevaya') return 'kilevaya';
+  if (x.includes('тоннел') || x === 'tonnelnaya') return 'tonnelnaya';
+  if (x.includes('rib') || x.includes('риб')) return 'rib';
+  return undefined;
+}
+function normFloorType(s: string): string | undefined {
+  if (!s) return undefined;
+  const x = String(s).toLowerCase().replace(/[^a-zа-я0-9]/g,'');
+  if (x.includes('фанер') || x === 'fanera') return 'fanera';
+  if (x.includes('алюм') || x === 'aluminum') return 'aluminum';
+  if (x.includes('надув') || x.includes('air') || x.includes('airdeck') || x === 'air') return 'air';
+  return undefined;
+}
+
+// ============ ПРИМЕНЕНИЕ ФИЛЬТРОВ ============
+let filtered = [...brandProducts];
+
+// 1) Цена — ВСЕГДА
+if (qpPrice) filtered = filtered.filter((pr) => inRange(pr.price, qpPrice));
+
+// 2) Фильтры по категории
+if (mainCatSlug === 'kvadrocikly') {
+  // Кубатура квадроциклов
+  if (qpCC) filtered = filtered.filter((pr) => inRange(pr.filters?.engine_cc, qpCC));
+} else if (mainCatSlug === 'lodochnye-motory') {
+  if (qpTact) filtered = filtered.filter((pr) => normTact(pr.filters?.tact) === qpTact);
+  if (qpPower) filtered = filtered.filter((pr) => inRange(pr.filters?.power_hp, qpPower));
+  if (qpControl) filtered = filtered.filter((pr) => normControl(pr.filters?.control_type) === qpControl);
+  if (qpPropulsion) filtered = filtered.filter((pr) => normPropulsion(pr.filters?.propulsion) === qpPropulsion);
+} else if (mainCatSlug === 'snegohody') {
+  if (qpTact) filtered = filtered.filter((pr) => normTact(pr.filters?.tact) === qpTact);
+  if (qpTrack) filtered = filtered.filter((pr) => inRange(pr.filters?.track_width_mm, qpTrack));
+} else if (mainCatSlug === 'lodki') {
+  if (qpBoatType) filtered = filtered.filter((pr) => normBoatType(pr.filters?.boat_type) === qpBoatType);
+  if (qpFloorType) filtered = filtered.filter((pr) => normFloorType(pr.filters?.floor_type) === qpFloorType);
+}
+
+// Построение ссылок (чтобы при переключении одного фильтра другие сохранялись)
+function link(params: Record<string, string>): string {
+  const sp = new URLSearchParams(Astro.url.searchParams);
+  for (const [k, v] of Object.entries(params)) {
+    if (!v) sp.delete(k); else sp.set(k, v);
+  }
+  const qs = sp.toString();
+  return qs ? `?${qs}` : `#`;
+}
+function anyFilterActive(): boolean {
+  return !!(qpPrice || qpCC || qpTact || qpPower || qpControl || qpPropulsion || qpTrack || qpBoatType || qpFloorType);
+}
+
+const layoutClass = brandProducts.length > 0 ? 'layout-with-filters' : '';
 ---
 
-<Layout title={`${categoryTitle} — ${brand}`}>
-  <nav class="breadcrumb">
-    <a href="/catalog">Каталог</a> /
-    <a href={`/catalog/${categorySlug}`}>{categoryTitle}</a> /
-    <span>{brand}</span>
-  </nav>
+<Layout title={`${brandTitle} — купить в Красноярске по цене от ${minPrice.toLocaleString()} ₽`} description={subtitle} heroImage={heroImg} heroSubtitle={subtitle}>
+  <div class="container container--py">
+    <!-- Хлебные крошки -->
+    <nav class="breadcrumb">
+      <a href="/">Главная</a> /
+      <a href="/catalog">Каталог</a> /
+      <a href={`/catalog/${mainCatSlug}`}>{mainCatTitle}</a> /
+      <span>{brandTitle}</span>
+    </nav>
 
-  <h1>{brand}</h1>
+    <div class="title-row">
+      <h1 class="page-title">{brandTitle} — {brandProducts.length} {brandProducts.length === 1 ? 'модель' : brandProducts.length < 5 ? 'модели' : 'моделей'}</h1>
+      {anyFilterActive() && (
+        <a href={`/catalog/${categorySlug}/${brandSlug}`} class="reset-btn">× Сбросить все фильтры</a>
+      )}
+    </div>
+    <p class="subtitle-small">{subtitle}</p>
 
-  <div class="filters">
-    {priceRanges.map((range) => (
-      <a href={`?price=${range.value}`} class={range.value === currentPrice ? 'active' : ''}>
-        {range.label}
-      </a>
-    ))}
-  </div>
+    {brandProducts.length === 0 ? (
+      <div class="empty"><p>Товаров пока нет. Скоро появятся.</p></div>
+    ) : (
+      <div class={`shop-layout ${layoutClass}`}>
 
-  <div class="grid">
-    {filtered.map((product) => (
-      <a
-        href={`/catalog/${categorySlug}/${product.brandSlug}/${product.modelSlug}`}
-        class="card"
-      >
-        <img src={product.photo[0] || '/placeholder.jpg'} alt={product.title} />
-        <h3>{product.title}</h3>
-        <span class="price">{product.price.toLocaleString()} ₽</span>
-      </a>
-    ))}
+        {/* ============ ФИЛЬТРЫ СЛЕВА ============ */}
+        <aside class="filter-sidebar">
+          <div class="filter-block">
+            <h3 class="filter-title">💰 Цена</h3>
+            <div class="filter-list">
+              {priceRanges.map((r) => (
+                <a
+                  href={link({ price: r.v })}
+                  class={`filter-item ${r.v === qpPrice ? 'active' : ''}`}
+                >{r.label}</a>
+              ))}
+            </div>
+          </div>
+
+          {/* === Фильтры ТОЛЬКО для квадроциклов === */}
+          {mainCatSlug === 'kvadrocikly' && (
+            <div class="filter-block">
+              <h3 class="filter-title">🔧 Объем двигателя</h3>
+              <div class="filter-list">
+                {ccRanges.map((r) => (
+                  <a href={link({ cc: r.v })} class={`filter-item ${r.v === qpCC ? 'active' : ''}`}>{r.label}</a>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* === Фильтры ТОЛЬКО для лодочных моторов === */}
+          {mainCatSlug === 'lodochnye-motory' && (<>
+            <div class="filter-block">
+              <h3 class="filter-title">⚙️ Тактность</h3>
+              <div class="filter-list">
+                {tactFilters.map((r) => (
+                  <a href={link({ tact: r.v })} class={`filter-item ${r.v === qpTact ? 'active' : ''}`}>{r.label}</a>
+                ))}
+              </div>
+            </div>
+            <div class="filter-block">
+              <h3 class="filter-title">🔥 Мощность (л.с.)</h3>
+              <div class="filter-list">
+                {powerRanges.map((r) => (
+                  <a href={link({ power: r.v })} class={`filter-item ${r.v === qpPower ? 'active' : ''}`}>{r.label}</a>
+                ))}
+              </div>
+            </div>
+            <div class="filter-block">
+              <h3 class="filter-title">🎮 Управление</h3>
+              <div class="filter-list">
+                {controlFilters.map((r) => (
+                  <a href={link({ ctl: r.v })} class={`filter-item ${r.v === qpControl ? 'active' : ''}`}>{r.label}</a>
+                ))}
+              </div>
+            </div>
+            <div class="filter-block">
+              <h3 class="filter-title">🚤 Движитель</h3>
+              <div class="filter-list">
+                {propulsionFilters.map((r) => (
+                  <a href={link({ prop: r.v })} class={`filter-item ${r.v === qpPropulsion ? 'active' : ''}`}>{r.label}</a>
+                ))}
+              </div>
+            </div>
+          </>)}
+
+          {/* === Фильтры ТОЛЬКО для снегоходов === */}
+          {mainCatSlug === 'snegohody' && (<>
+            <div class="filter-block">
+              <h3 class="filter-title">⚙️ Тактность</h3>
+              <div class="filter-list">
+                {tactFilters.map((r) => (
+                  <a href={link({ tact: r.v })} class={`filter-item ${r.v === qpTact ? 'active' : ''}`}>{r.label}</a>
+                ))}
+              </div>
+            </div>
+            <div class="filter-block">
+              <h3 class="filter-title">🛞 Ширина гусеницы</h3>
+              <div class="filter-list">
+                {trackFilters.map((r) => (
+                  <a href={link({ track: r.v })} class={`filter-item ${r.v === qpTrack ? 'active' : ''}`}>{r.label}</a>
+                ))}
+              </div>
+            </div>
+          </>)}
+
+          {/* === Фильтры ТОЛЬКО для лодок === */}
+          {mainCatSlug === 'lodki' && (<>
+            <div class="filter-block">
+              <h3 class="filter-title">⛵ Тип лодки</h3>
+              <div class="filter-list">
+                {boatTypeFilters.map((r) => (
+                  <a href={link({ bt: r.v })} class={`filter-item ${r.v === qpBoatType ? 'active' : ''}`}>{r.label}</a>
+                ))}
+              </div>
+            </div>
+            <div class="filter-block">
+              <h3 class="filter-title">🏗️ Тип днища</h3>
+              <div class="filter-list">
+                {floorTypeFilters.map((r) => (
+                  <a href={link({ ft: r.v })} class={`filter-item ${r.v === qpFloorType ? 'active' : ''}`}>{r.label}</a>
+                ))}
+              </div>
+            </div>
+          </>)}
+
+          <div class="filter-summary">
+            Найдено: <b>{filtered.length}</b> {filtered.length === 1 ? 'модель' : filtered.length < 5 ? 'модели' : 'моделей'}
+          </div>
+        </aside>
+
+        {/* ============ ТОВАРЫ СПРАВА 3 В РЯД ============ */}
+        <main class="products-main">
+          {filtered.length === 0 ? (
+            <div class="empty">
+              <p>❌ Ни одного товара не подошло по выбранным фильтрам.</p>
+              <a href={`/catalog/${categorySlug}/${brandSlug}`} class="reset">↺ Сбросить фильтры</a>
+            </div>
+          ) : (
+            <div class={`grid-3col ${isTall ? 'grid--tall' : ''}`}>
+              {filtered.map((product) => {
+                const imgSrc = product.photo?.[0];
+                const optimizedImg = getProductImage(imgSrc, 'technique');
+                return (
+                  <a
+                    href={`/catalog/${categorySlug}/${product.brandSlug}/${product.modelSlug}`}
+                    class="card"
+                  >
+                    <div class={`card__img ${isTall ? 'card__img--tall' : ''}`}>
+                      {optimizedImg ? (
+                        <Image
+                          src={optimizedImg}
+                          alt={product.title}
+                          width={500}
+                          height={isTall ? 667 : 375}
+                          fit="contain"
+                          loading="lazy"
+                          decoding="async"
+                          format="webp"
+                          quality={85}
+                        />
+                      ) : (
+                        <img src={imgSrc || '/placeholder.jpg'} alt={product.title} loading="lazy" />
+                      )}
+                    </div>
+
+                    {product.quantity !== undefined && product.quantity !== null && (
+                      <span class={`badge ${product.quantity > 0 ? 'in-stock' : 'out-of-stock'}`}>
+                        {product.quantity > 0 ? `✅ В наличии: ${product.quantity}` : '⏱️ Под заказ'}
+                      </span>
+                    )}
+
+                    <div class="card__body">
+                      <h3>{product.title}</h3>
+                      {product.article && <span class="art">Арт. {product.article}</span>}
+                      <div class="char-preview">
+                        {product.filters?.engine_cc && <span>🔧 {product.filters.engine_cc} см³</span>}
+                        {product.filters?.power_hp && <span>🔥 {product.filters.power_hp} л.с.</span>}
+                        {product.filters?.tact && <span>⚙️ {product.filters.tact}-такт.</span>}
+                      </div>
+                      <div class="card__price-row">
+                        <span class="price">{product.price?.toLocaleString('ru-RU') || 'Цену уточняйте'} ₽</span>
+                      </div>
+                      <button type="button" class="card__cta">Подробнее →</button>
+                    </div>
+                  </a>
+                );
+              })}
+            </div>
+          )}
+        </main>
+      </div>
+    )}
   </div>
 </Layout>
 
 <style>
-  .breadcrumb { padding: 1rem; color: #666; font-size: 0.9rem; }
-  .breadcrumb a { color: #333; }
-  .filters { display: flex; gap: 1rem; padding: 1rem; flex-wrap: wrap; }
-  .filters a { padding: 0.5rem 1rem; border: 1px solid #ddd; border-radius: 6px; text-decoration: none; color: #333; }
-  .filters a.active { background: #e63946; color: white; border-color: #e63946; }
-  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 1.5rem; padding: 1rem; }
-  .card { border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); text-decoration: none; color: inherit; transition: transform 0.2s; }
-  .card:hover { transform: translateY(-4px); }
-  .card img { width: 100%; height: 200px; object-fit: cover; background: #eee; }
-  .card h3 { margin: 0.5rem; font-size: 1rem; }
-  .price { font-weight: bold; color: #e63946; margin: 0.5rem; display: block; }
+  .container { max-width: 1400px; margin: 0 auto; padding: 0 20px; }
+  .container--py { padding-top: 1.5rem; padding-bottom: 3rem; }
+
+  .breadcrumb { color: #6b7280; font-size: 0.88rem; margin-bottom: 0.8rem; }
+  .breadcrumb a { color: #374151; text-decoration: none; }
+  .breadcrumb a:hover { color: #f59e0b; }
+
+  .title-row { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 1rem; margin-bottom: 0.25rem; }
+  .page-title { font-size: clamp(1.5rem, 2.5vw, 2rem); font-weight: 900; margin: 0; letter-spacing: -0.02em; color: #111827; }
+  .reset-btn {
+    background: #fee2e2; color: #991b1b; padding: 0.5rem 1rem;
+    border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 0.9rem;
+    border: 1px solid #fecaca; transition: all 0.15s;
+  }
+  .reset-btn:hover { background: #fecaca; }
+  .subtitle-small { color: #6b7280; font-size: 0.98rem; margin: 0 0 1.8rem; }
+
+  /* ====== Layout: слева фильтры, справа товары ====== */
+  .shop-layout {
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    gap: 2rem;
+    align-items: start;
+  }
+  @media (max-width: 980px) {
+    .shop-layout { grid-template-columns: 1fr; }
+  }
+
+  /* ====== Фильтр-бар ====== */
+  .filter-sidebar {
+    position: sticky;
+    top: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    max-height: calc(100vh - 2rem);
+    overflow-y: auto;
+    padding-right: 4px;
+  }
+  @media (max-width: 980px) {
+    .filter-sidebar { position: static; max-height: none; }
+  }
+  .filter-block {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    padding: 1rem;
+  }
+  .filter-title { margin: 0 0 0.6rem; font-size: 0.95rem; font-weight: 700; color: #111827; }
+  .filter-list { display: flex; flex-direction: column; gap: 0.25rem; }
+  .filter-item {
+    display: block;
+    padding: 0.45rem 0.7rem;
+    font-size: 0.88rem;
+    border-radius: 6px;
+    color: #4b5563;
+    text-decoration: none;
+    transition: all 0.12s;
+  }
+  .filter-item:hover { background: #fef3c7; color: #92400e; }
+  .filter-item.active {
+    background: #1f2937;
+    color: #fbbf24;
+    font-weight: 700;
+  }
+  .filter-summary {
+    padding: 0.9rem 1rem;
+    background: #ecfeff;
+    border: 1px solid #a5f3fc;
+    border-radius: 10px;
+    font-size: 0.9rem;
+    color: #155e75;
+    text-align: center;
+  }
+
+  /* ====== Товары ====== */
+  .products-main { min-width: 0; }
+
+  /* ТРИ ТОВАРА В РЯД всегда (кроме мобилок) */
+  .grid-3col {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1.5rem;
+  }
+  @media (max-width: 1200px) { .grid-3col { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 600px) { .grid-3col { grid-template-columns: repeat(2, 1fr); gap: 1rem; } }
+  @media (max-width: 420px) { .grid-3col { grid-template-columns: 1fr; } }
+  .grid--tall { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  @media (max-width: 1200px) { .grid--tall { grid-template-columns: repeat(2, 1fr); } }
+
+  /* ====== Карточка товара ====== */
+  .card {
+    position: relative;
+    background: #fff;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.07);
+    text-decoration: none;
+    color: inherit;
+    transition: transform 0.2s, box-shadow 0.2s;
+    display: flex;
+    flex-direction: column;
+  }
+  .card:hover { transform: translateY(-5px); box-shadow: 0 16px 36px rgba(0,0,0,0.14); }
+
+  /* ⭐ object-contain + contain: layout — товар ВСЕГДА вписан целиком, нет деформации (которая «как будто зажали») */
+  .card__img {
+    aspect-ratio: 4 / 3;
+    background: linear-gradient(135deg, #f8fafc 0%, #eef2f7 100%);
+    display: flex; align-items: center; justify-content: center;
+    padding: 1rem;
+    overflow: hidden;
+    contain: layout style;
+  }
+  .card__img--tall { aspect-ratio: 3 / 4; padding: 1.25rem 0.75rem; }
+  .card__img :global(img),
+  .card__img img {
+    max-width: 100%;
+    max-height: 100%;
+    width: auto !important;
+    height: auto !important;
+    object-fit: contain !important;
+    transition: transform 0.35s ease-out;
+    display: block;
+  }
+  .card:hover .card__img :global(img) { transform: scale(1.05); }
+
+  .badge { position: absolute; top: 10px; left: 10px; font-size: 0.72rem; padding: 5px 10px; border-radius: 20px; font-weight: 600; z-index: 2; }
+  .badge.in-stock { background: #10b981; color: #fff; }
+  .badge.out-of-stock { background: #f59e0b; color: #1a2027; }
+
+  .card__body { padding: 1rem 1.1rem 1.3rem; display: flex; flex-direction: column; gap: 0.4rem; flex: 1; }
+  .card__body h3 { font-size: 0.95rem; font-weight: 700; margin: 0; line-height: 1.35; min-height: 2.8em; color: #111827; }
+  .art { color: #9ca3af; font-size: 0.78rem; }
+  .char-preview { display: flex; flex-wrap: wrap; gap: 0.3rem; margin: 0.25rem 0; }
+  .char-preview span {
+    font-size: 0.72rem;
+    background: #fef9c3;
+    color: #854d0e;
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-weight: 500;
+  }
+  .card__price-row { margin-top: auto; padding-top: 0.35rem; }
+  .price { font-weight: 800; color: #111827; font-size: 1.2rem; display: block; letter-spacing: -0.01em; }
+  .card__cta {
+    margin-top: 0.7rem;
+    width: 100%;
+    background: #fbbf24;
+    color: #1f2937;
+    border: none;
+    padding: 0.6rem 1rem;
+    border-radius: 8px;
+    font-weight: 700;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: background 0.2s;
+  }
+  .card:hover .card__cta { background: #f59e0b; color: #fff; }
+
+  .empty { padding: 4rem 0; text-align: center; }
+  .empty p { color: #6b7280; font-size: 1.05rem; margin-bottom: 1.2rem; }
+  .reset { display: inline-block; background: #e63946; color: #fff; padding: 0.65rem 1.5rem; border-radius: 8px; text-decoration: none; font-weight: 600; }
 </style>

@@ -4,8 +4,10 @@ import Footer from '../components/Footer.astro';
 export interface Props {
   title: string;
   description?: string;
+  heroImage?: any;   // опционально: картинка hero-баннера
+  heroSubtitle?: string;
 }
-const { title, description } = Astro.props;
+const { title, description, heroImage, heroSubtitle } = Astro.props;
 ---
 <!doctype html>
 <html lang="ru">
@@ -15,13 +17,142 @@ const { title, description } = Astro.props;
   <link rel="icon" type="image/png" href="/favicon.png" />
   <title>{title} — Мир Моторов</title>
   {description && <meta name="description" content={description} />}
-  <!-- Подключите глобальные стили, если нужно -->
 </head>
 <body>
   <Header />
+  {heroImage && (
+    <div class="page-hero">
+      <div class="page-hero__inner">
+        <h1 class="page-hero__title">{title}</h1>
+        {heroSubtitle && <p class="page-hero__subtitle">{heroSubtitle}</p>}
+      </div>
+      <div class="page-hero__image-wrapper">
+        <img src={typeof heroImage === 'string' ? heroImage : heroImage.src} alt="" class="page-hero__image" />
+      </div>
+    </div>
+  )}
   <main>
     <slot />
   </main>
   <Footer />
 </body>
 </html>
+
+<style is:global>
+  /* ============ ГЛОБАЛЬНЫЕ СТИЛИ ============ */
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #fafafa; color: #1a2027; font-family: 'Segoe UI', Roboto, Arial, sans-serif; line-height: 1.5; }
+  main { display: block; }
+  h1, h2, h3, h4 { margin: 0 0 1rem; line-height: 1.25; color: #1a2027; }
+  p { margin: 0 0 1rem; }
+  img { max-width: 100%; display: block; }
+  a { color: inherit; }
+
+  /* ===== ОБЩИЙ КОНТЕЙНЕР (как Header 1400px) ===== */
+  .container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0 20px;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .container--py { padding-top: 2rem; padding-bottom: 2rem; }
+
+  /* ===== PAGE HERO (картинка + заголовок категории) ===== */
+  .page-hero {
+    position: relative;
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0 20px;
+    box-sizing: border-box;
+    min-height: 340px;
+    display: flex;
+    align-items: center;
+    overflow: hidden;
+    border-radius: 0 0 12px 12px;
+    margin-bottom: 2.5rem;
+  }
+  .page-hero::before {
+    content: '';
+    position: absolute;
+    inset: 0 20px;
+    background: linear-gradient(135deg, rgba(26,32,39,0.92) 0%, rgba(26,32,39,0.65) 50%, rgba(26,32,39,0.35) 100%);
+    z-index: 2;
+    border-radius: 0 0 12px 12px;
+  }
+  .page-hero__inner {
+    position: relative;
+    z-index: 3;
+    padding: 3rem 2.5rem;
+    max-width: 700px;
+  }
+  .page-hero__title {
+    font-size: clamp(2rem, 4vw, 3.2rem);
+    color: #fff;
+    font-weight: 800;
+    margin: 0 0 0.8rem;
+    letter-spacing: -0.02em;
+    text-shadow: 0 2px 20px rgba(0,0,0,0.3);
+  }
+  .page-hero__subtitle {
+    color: rgba(255,255,255,0.92);
+    font-size: 1.1rem;
+    margin: 0;
+    max-width: 560px;
+  }
+  .page-hero__image-wrapper {
+    position: absolute;
+    inset: 0 20px;
+    z-index: 1;
+    border-radius: 0 0 12px 12px;
+  }
+  .page-hero__image {
+    width: 100%;
+    height: 100%;
+    min-height: 340px;
+    object-fit: cover;
+    object-position: center 35%;
+  }
+
+  /* ===== ФИКС РАЗМЕРОВ КАРТИНОК В КАТОЛОЖНЫХ КАРТОЧКАХ ===== */
+  /* object-contain + белый фон = товар никогда не обрезается, вписывается целиком */
+  :global(.product-img-wrapper) {
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    background: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    padding: 1.25rem;
+    box-sizing: border-box;
+  }
+  :global(.product-img-wrapper) img,
+  :global(.product-img-wrapper) :global(img) {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: contain !important;
+    max-width: 100%;
+    max-height: 100%;
+  }
+
+  /* Для вертикальных товаров (лодочные моторы) — делаем портретный размер */
+  :global(.product-img-wrapper--tall) {
+    aspect-ratio: 3 / 4;
+  }
+
+  /* ===== ПАГИНАЦИЯ / ХЛЕБНЫЕ КРОШКИ ===== */
+  :global(.breadcrumb) {
+    padding: 1rem 0;
+    color: #6b7280;
+    font-size: 0.9rem;
+  }
+  :global(.breadcrumb a) { color: #1a2027; text-decoration: none; }
+  :global(.breadcrumb a:hover) { text-decoration: underline; }
+
+  /* ===== УТИЛИТЫ ===== */
+  .text-center { text-align: center; }
+  .mt-2 { margin-top: 2rem; }
+  .mb-2 { margin-bottom: 2rem; }
+</style>

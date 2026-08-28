@@ -1,10 +1,12 @@
 ---
 import Layout from '../../../../layouts/Layout.astro';
-import products from '../../../../data/products.json';
+import { Image } from 'astro:assets';
+import { getAllProducts } from '../../../../utils/load-products';
+import { getProductImage } from '../../../../utils/image-loader';
 import { categoryToSlug, getMainCategory } from '../../../../utils/transliterate';
 
 export function getStaticPaths() {
-  return products
+  return getAllProducts()
     .filter((p) => p.brandSlug && p.modelSlug && p.category)
     .map((product) => ({
       params: {
@@ -17,91 +19,735 @@ export function getStaticPaths() {
 }
 
 const { product } = Astro.props;
+const mainCat = getMainCategory(product.category) || '';
+const mainCatSlug = categoryToSlug(mainCat);
 const categorySlug = categoryToSlug(product.category);
-const categoryTitle = getMainCategory(product.category);
-const pageTitle = product.seo?.title || product.title;
+const pageTitle = product.seo?.title || `${product.title} — купить в Красноярске`;
+const pageDescription = product.seo?.description || product.description || `Купить ${product.title} в Красноярске. Официальный дилер, гарантия, доставка.`;
+
+// Все фото товара, оптимизированные через astro:assets + миниатюры
+const photos: { rel: string; big: any; thumb: any }[] = [];
+(product.photo || []).forEach((src: string) => {
+  const s = String(src || '').trim();
+  if (!s) return;
+  const big = getProductImage(s, 'technique');
+  const thumb = getProductImage(s, 'technique'); // astro:assets берет 1 импорт — используем тот же
+  photos.push({ rel: s, big: big || s, thumb: thumb || s });
+});
+const firstPhoto = photos[0];
+
+// ====== СОПУТСТВУЮЩИЕ ТОВАРЫ ======
+// Алгоритм: находим товары, у которых в relatedTags есть modelSlug ТЕКУЩЕГО товара,
+// а также — если у ТЕКУЩЕГО товара есть relatedTags, то ищем их modelSlug.
+const allProducts = getAllProducts();
+const mySlug = product.modelSlug || '';
+const myRelated = (product.relatedTags || []) as string[];
+const related: any[] = [];
+for (const p of allProducts) {
+  if (p.modelSlug === mySlug) continue; // сам себе не сопутствующий
+  const theirSlug = p.modelSlug || '';
+  const theirTags = (p.relatedTags || []) as string[];
+  const match1 = theirTags.includes(mySlug);  // у другого написано что подходит мне
+  const match2 = myRelated.includes(theirSlug); // у меня написано что подходит он
+  if (match1 || match2) related.push(p);
+  if (related.length >= 12) break;
+}
+
+const isTall = mainCatSlug === 'lodochnye-motory';
+
+// ======== ⚙️ ХАРАКТЕРИСТИКИ: СТАНДАРТНЫЙ НАБОР ПО КАТЕГОРИЯМ ========
+// В CSV столбцы должны называться ТОЧНО как ключи справа (без пробелов, можно _)
+// Имя столбца в CSV (например char_Dvigatel или Двигатель) — подхватится
+const STD_CHARS: Record<string, [string, string][]> = {
+  kvadrocikly: [
+    ['engine_type', 'Тип двигателя'],
+    ['engine_cc', 'Объем двигателя, см³'],
+    ['max_power', 'Максимальная мощность, л.с.'],
+    ['transmission', 'Тип трансмиссии'],
+    ['drive', 'Система привода'],
+    ['front_susp', 'Передняя подвеска'],
+    ['rear_susp', 'Задняя подвеска'],
+    ['shocks', 'Амортизаторы'],
+    ['tires', 'Шины'],
+    ['wheels', 'Диски'],
+    ['steering', 'Рулевое управление'],
+    ['fuel_tank', 'Объем топливного бака, л'],
+    ['dimensions', 'Габаритные размеры, мм (Д×Ш×В)'],
+    ['equipment', 'Комплектация'],
+  ],
+  snegohody: [
+    ['engine_type', 'Тип двигателя'],
+    ['engine_cc', 'Объем двигателя, см³'],
+    ['max_power', 'Максимальная мощность, л.с./кВт (об/мин)'],
+    ['transmission', 'Тип трансмиссии'],
+    ['starter', 'Система запуска'],
+    ['front_susp', 'Передняя подвеска'],
+    ['track', 'Гусеница: длина / ширина / высота грунтозацепа / шаг, мм'],
+    ['fuel_system', 'Система питания'],
+    ['weight', 'Сухая / снаряженная масса, кг'],
+    ['brakes', 'Тормозная система'],
+    ['fuel_tank', 'Объем топливного бака, л'],
+    ['dimensions', 'Габаритные размеры, мм (Д×Ш×В)'],
+    ['equipment', 'Комплектация'],
+  ],
+  lodki: [
+    ['length_width', 'Длина / ширина, см'],
+    ['cockpit', 'Кокпит, см'],
+    ['balloon_d', 'Диаметр баллонов, см'],
+    ['weight', 'Вес, кг'],
+    ['seats', 'Посадочные места, чел.'],
+    ['max_hp', 'Макс. мощность ПЛМ, л.с.'],
+    ['capacity', 'Грузоподъемность, кг'],
+    ['balloons_qty', 'Количество баллонов, шт.'],
+    ['equipment', 'Комплектация'],
+  ],
+  'lodochnye-motory': [
+    ['engine_type', 'Тип двигателя'],
+    ['engine_cc', 'Объем двигателя, см³'],
+    ['max_power', 'Максимальная мощность, л.с.'],
+    ['gearbox', 'Передачи'],
+    ['starter', 'Система запуска'],
+    ['rpm_range', 'Диапазон рабочих оборотов, об/мин'],
+    ['fuel_system', 'Система подачи топлива'],
+    ['fuel_cons', 'Расход топлива на полном ходу, л/ч'],
+    ['fuel_rec', 'Рекомендуемый бензин'],
+    ['control_type', 'Система управления'],
+    ['trim', 'Трим'],
+    ['leg_len', 'Длина «ноги», мм'],
+    ['weight', 'Вес, кг'],
+  ],
+};
+
+// ═══════════════════════════════════════════════════════════
+// Извлекаем значение характеристики: ищем в char_*, или по ключу, или по названию
+function getCharValue(p: any, key: string): string | null {
+  if (!p) return null;
+  // 1) в product.characteristics по КЛЮЧУ
+  if (p.characteristics && p.characteristics[key]) {
+    const v = String(p.characteristics[key]);
+    if (v && v.trim()) return v.trim();
+  }
+  // 2) в product по КЛЮЧУ (например product.engine_cc)
+  if (p[key] !== undefined && p[key] !== null && String(p[key]).trim()) return String(p[key]).trim();
+  // 3) в product.characteristics по НАЗВАНИЮ
+  if (p.characteristics) {
+    for (const [k, v] of Object.entries(p.characteristics)) {
+      if (k.toLowerCase().replace(/[_\-]/g, '') === key.toLowerCase().replace(/[_\-]/g, '')) {
+        if (v && String(v).trim()) return String(v).trim();
+      }
+    }
+  }
+  // 4) дополнительно: поиск по char_ + ключу
+  if (p.characteristics) {
+    const charKey = `char_${key}`;
+    if (p.characteristics[charKey]) return String(p.characteristics[charKey]).trim();
+  }
+  return null;
+}
+
+const stdCharList = (STD_CHARS[mainCatSlug] || []).filter(([k, _n]) => getCharValue(product, k) !== null);
+
+// ===== ЦЕНА (как в CSV). Ниже подпись «с учетом НДС 22%» =====
+const price = product.price ?? 0;
+const vatRate = 0.22;
+const priceVatOnly = Math.round(price * vatRate / (1 + vatRate));   // сумма НДС внутри цены
+const priceNoVat = Math.round(price - priceVatOnly);                // цена без НДС
+const oldPrice = product.oldPrice && product.oldPrice > price ? product.oldPrice : null;
+
+// ===== Полное описание: либо text, либо отдельный CSV столбец full_text, либо description =====
+const fullText = product.full_text || product.text || product.long_description || product.description;
 ---
 
-<Layout title={pageTitle}>
-  <nav class="breadcrumb">
-    <a href="/catalog">Каталог</a> /
-    <a href={`/catalog/${categorySlug}`}>{categoryTitle}</a> /
-    <a href={`/catalog/${categorySlug}/${product.brandSlug}`}>{product.brandSlug}</a> /
-    <span>{product.title}</span>
-  </nav>
+<Layout title={pageTitle} description={pageDescription}>
+  <div class="container">
+    <!-- Хлебные крошки -->
+    <nav class="breadcrumb">
+      <a href="/">Главная</a> /
+      <a href="/catalog">Каталог</a> /
+      <a href={`/catalog/${mainCatSlug}`}>{mainCat}</a> /
+      <a href={`/catalog/${categorySlug}/${product.brandSlug}`}>{product.brand || product.brandSlug}</a> /
+      <span>{product.title}</span>
+    </nav>
 
-  <div class="product-page">
-    <div class="gallery">
-      {product.photo.length > 0 ? (
-        product.photo.map((src) => (
-          <img src={src.trim()} alt={product.title} />
-        ))
-      ) : (
-        <img src="/placeholder.jpg" alt={product.title} />
-      )}
-    </div>
-    <div class="info">
-      <h1>{product.title}</h1>
-      <div class="prices">
-        <span class="price">{product.price.toLocaleString()} ₽</span>
-        {product.oldPrice && (
-          <span class="old-price">{product.oldPrice.toLocaleString()} ₽</span>
+    {/* H1 Заголовок — СРАЗУ после хлебных крошек (по ТЗ) */}
+    <h1 class="page-h1">{product.title}</h1>
+
+    {/* ======================= 1) ВЕРХНЯЯ ЧАСТЬ — ГАЛЕРЕЯ (ЛЕВО) + ИНФО (СПРАВО) ======================= */}
+    <div class="product-top">
+
+      {/* ========= ЛЕВО: ОСНОВНАЯ КАРТИНКА + МИНИАТЮРЫ ========= */}
+      <div class="gallery-wrap">
+
+        {/* БОЛЬШАЯ КАРТИНКА (object-fit: contain — НИКОГДА не зажимает!) */}
+        <div class={`main-image ${isTall ? 'main-image--tall' : ''}`} id="main-image-box">
+          {firstPhoto ? (
+            firstPhoto.big && typeof firstPhoto.big !== 'string' ? (
+              <Image
+                id="product-main-image"
+                src={firstPhoto.big}
+                alt={product.title}
+                width={900}
+                height={isTall ? 1200 : 680}
+                fit="contain"
+                format="webp"
+                quality={90}
+                data-main="1"
+              />
+            ) : (
+              <img id="product-main-image" src={String(firstPhoto.big)} alt={product.title} />
+            )
+          ) : (
+            <img id="product-main-image" src="/placeholder.jpg" alt={product.title} />
+          )}
+        </div>
+
+        {/* МИНИАТЮРЫ (горизонтальный скролл, клик — меняют большую) */}
+        {photos.length > 1 && (
+          <div class="thumbs-scroll">
+            <div class="thumbs-inner">
+              {photos.map((ph, i) => (
+                <button
+                  type="button"
+                  class={`thumb ${i === 0 ? 'active' : ''}`}
+                  data-index={i}
+                  aria-label={`Фото ${i + 1}`}
+                >
+                  {typeof ph.thumb !== 'string' ? (
+                    <Image
+                      src={ph.thumb}
+                      alt={`${product.title} фото ${i + 1}`}
+                      width={160}
+                      height={isTall ? 220 : 120}
+                      fit="contain"
+                      format="webp"
+                      quality={75}
+                    />
+                  ) : (
+                    <img src={ph.thumb} alt={`${product.title} фото ${i + 1}`} loading="lazy" />
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
         )}
       </div>
-      {product.description && <p>{product.description}</p>}
-      <button class="btn-contact" id="contact-btn">Связаться со мной</button>
+
+      {/* ========= ПРАВО: ИНФО О ТОВАРЕ (ТОЛЬКО ЦЕНА + НАЛИЧИЕ + КНОПКА) ========= */}
+      <aside class="info-card">
+        {product.brand && <div class="brand-pill">🏷️ {product.brand}</div>}
+
+        <div class="top-meta">
+          {product.quantity !== undefined && product.quantity !== null && (
+            <div class={`stock ${product.quantity > 0 ? 'ok' : 'na'}`}>
+              {product.quantity > 0
+                ? `✅ В наличии — ${product.quantity} шт.`
+                : '⏱️ Под заказ, 2–5 раб. дней'}
+            </div>
+          )}
+          {product.article && <div class="article-pill">Арт. <b>{product.article}</b></div>}
+        </div>
+
+        {/* ============ ЦЕНА (как в CSV) ============ */}
+        <div class="price-block">
+          <div class="price-main">{price.toLocaleString('ru-RU')} ₽</div>
+          {oldPrice && (
+            <>
+              <div class="price-old">{oldPrice.toLocaleString('ru-RU')} ₽</div>
+              <div class="discount-badge">−{Math.round((1 - price / oldPrice) * 100)}%</div>
+            </>
+          )}
+          <div class="price-vat-note">
+            ✅ Цена указана с учетом НДС 22%
+            {price > 0 && (
+              <span class="price-no-vat">
+                <br />
+                <span>В том числе НДС: {priceVatOnly.toLocaleString('ru-RU')} ₽</span>
+                <span>Стоимость без НДС: {priceNoVat.toLocaleString('ru-RU')} ₽</span>
+              </span>
+            )}
+          </div>
+        </div>
+
+        <button class="btn-primary" id="contact-btn">📞 Забронировать</button>
+        <p class="btn-sub">Менеджер перезвонит в течение 15 минут в рабочее время</p>
+      </aside>
+    </div>
+
+    {/* ======================= 2) НИЖНЯЯ ЧАСТЬ ======================= */}
+    <div class="product-bottom">
+
+      {/* ======== 📖 О товаре — ПО ЦЕНТРУ (полное описание из CSV: `text` или `full_text`) ======== */}
+      {fullText && fullText.trim() && (
+        <section class="bottom-section">
+          <h2 class="h2-section">📖 О товаре</h2>
+          <div class="about-product">
+            {fullText.includes('<') || fullText.includes('&#') ? (
+              <Fragment set:html={fullText} />
+            ) : (
+              fullText.split(/\n+/).map((para: string, i: number) => {
+                const t = para.trim();
+                if (!t) return null;
+                if (/^(📌|✅|⚡|🏷️|🚚|📞|⚠️|❗|👉|ℹ️)/.test(t)) {
+                  return <p key={i} class="about-highlight">{t}</p>;
+                }
+                return <p key={i}>{t}</p>;
+              })
+            )}
+          </div>
+        </section>
+      )}
+
+      {/* ======== ⚙️ ТЕХНИЧЕСКИЕ ХАРАКТЕРИСТИКИ (стандарт + char_*) ======== */}
+      {(stdCharList.length > 0 || (product.characteristics && Object.keys(product.characteristics).filter(k => !k.startsWith('char_')).length > 0) || (product.characteristics && Object.keys(product.characteristics).filter(k => k.startsWith('char_')).length > 0)) && (
+        <section class="bottom-section">
+          <h2 class="h2-section">⚙️ Технические характеристики</h2>
+          <div class="chars-wrap">
+            <table class="chars-table">
+              <tbody>
+                {stdCharList.map(([key, name]) => {
+                  const v = getCharValue(product, key);
+                  if (!v) return null;
+                  return (
+                    <tr key={key}>
+                      <td class="ch-name">{name}</td>
+                      <td class="ch-value"><strong>{v}</strong></td>
+                    </tr>
+                  );
+                })}
+                {product.characteristics && Object.entries(product.characteristics)
+                  .filter(([k, _v]) => !k.startsWith('char_') && !STD_CHARS[mainCatSlug]?.some(([cK]) => getCharValue(product, cK) && cK === k.toLowerCase().replace(/[\s\-]/g, '_')))
+                  .map(([k, v]) => {
+                    if (!v || !String(v).trim()) return null;
+                    const niceName = k.replace(/^char_/, '').replace(/[_]+/g, ' ');
+                    return (
+                      <tr key={k}>
+                        <td class="ch-name">{niceName}</td>
+                        <td class="ch-value"><strong>{String(v)}</strong></td>
+                      </tr>
+                    );
+                  })}
+                {product.characteristics && Object.entries(product.characteristics)
+                  .filter(([k, _v]) => k.startsWith('char_'))
+                  .map(([k, v]) => {
+                    if (!v || !String(v).trim()) return null;
+                    const niceName = k.replace(/^char_/, '').replace(/[_]+/g, ' ');
+                    const already = stdCharList.find(([cK]) => getCharValue(product, cK) === String(v).trim());
+                    if (already) return null;
+                    return (
+                      <tr key={k}>
+                        <td class="ch-name">{niceName}</td>
+                        <td class="ch-value"><strong>{String(v)}</strong></td>
+                      </tr>
+                    );
+                  })}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
+      {related.length > 0 && (
+        <section class="bottom-section">
+          <h2 class="h2-section">🎯 Подходит к этому товару</h2>
+          <p class="sec-sub">Рекомендуемые аксессуары, запчасти и оборудование</p>
+
+          <div class="related-scroll">
+            <div class="related-inner">
+              {related.map((relP) => {
+                const imgSrc = relP.photo?.[0];
+                const optImg = getProductImage(imgSrc, 'technique');
+                const relMainCat = getMainCategory(relP.category) || '';
+                const url = `/catalog/${categoryToSlug(relP.category)}/${relP.brandSlug}/${relP.modelSlug}`;
+                return (
+                  <a href={url} class="related-card">
+                    <div class="rel-img">
+                      {optImg ? (
+                        <Image src={optImg} alt={relP.title} width={300} height={225} fit="contain" format="webp" quality={78} loading="lazy" />
+                      ) : (
+                        <img src={imgSrc || '/placeholder.jpg'} alt={relP.title} loading="lazy" />
+                      )}
+                    </div>
+                    <div class="rel-body">
+                      <div class="rel-cat">{relMainCat}</div>
+                      <div class="rel-title">{relP.title}</div>
+                      <div class="rel-price">
+                        {relP.price ? `${relP.price.toLocaleString('ru-RU')} ₽` : 'Цену уточняйте'}
+                      </div>
+                    </div>
+                  </a>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+      )}
     </div>
   </div>
 
+  {/* ====== Модалка ====== */}
   <div id="contact-modal" class="modal" style="display: none;">
     <div class="modal-content">
-      <span class="close">&times;</span>
-      <h2>Заявка на {product.title}</h2>
+      <span class="close" id="modal-close">&times;</span>
+      <h2>Заявка на <span id="modal-product">{product.title}</span></h2>
       <form id="contact-form">
-        <input type="text" name="name" placeholder="Ваше имя" required />
-        <input type="tel" name="phone" placeholder="Телефон" required />
-        <textarea name="comment" placeholder="Комментарий (необязательно)"></textarea>
-        <button type="submit">Отправить</button>
+        <input type="text" name="name" placeholder="Ваше имя *" required />
+        <input type="tel" name="phone" placeholder="Телефон *" required />
+        <textarea name="comment" placeholder="Комментарий: срок, доставка, цвет..."></textarea>
+        <button type="submit" class="btn-primary">Отправить заявку</button>
+        <p class="form-law">Нажимая кнопку вы соглашаетесь с политикой обработки персональных данных</p>
       </form>
     </div>
   </div>
 </Layout>
 
 <style>
-  .breadcrumb { padding: 1rem; color: #666; font-size: 0.9rem; max-width: 1200px; margin: 0 auto; }
-  .breadcrumb a { color: #333; }
-  .product-page { display: flex; flex-wrap: wrap; gap: 2rem; max-width: 1200px; margin: 2rem auto; padding: 0 20px; }
-  .gallery { flex: 1 1 400px; }
-  .gallery img { width: 100%; border-radius: 8px; margin-bottom: 0.5rem; background: #eee; }
-  .info { flex: 1 1 300px; }
-  .price { font-size: 2rem; font-weight: bold; color: #e63946; }
-  .old-price { text-decoration: line-through; color: #888; margin-left: 0.5rem; }
-  .btn-contact { margin-top: 2rem; padding: 0.8em 2em; background: #e63946; color: white; border: none; border-radius: 5px; cursor: pointer; }
-  .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 1000; }
-  .modal-content { background: white; padding: 2rem; border-radius: 10px; width: 90%; max-width: 400px; position: relative; }
-  .close { position: absolute; top: 10px; right: 15px; font-size: 1.5rem; cursor: pointer; color: #888; }
-  .modal input, .modal textarea { width: 100%; margin-bottom: 1rem; padding: 0.5rem; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; }
-  .modal button[type="submit"] { background: #e63946; color: white; border: none; padding: 0.7rem 1.5rem; border-radius: 5px; cursor: pointer; }
+/* ===== Общий контейнер ===== */
+.container { max-width: 1400px; margin: 0 auto; padding: 1.5rem 20px 3rem; }
+
+.breadcrumb { color: #6b7280; font-size: 0.88rem; margin-bottom: 1.3rem; }
+.breadcrumb a { color: #374151; text-decoration: none; }
+.breadcrumb a:hover { color: #f59e0b; }
+
+/* =========================== 1) ВЕРХНЯЯ ЧАСТЬ =========================== */
+.product-top {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  gap: 2rem;
+  align-items: start;
+  margin-bottom: 3rem;
+}
+@media (max-width: 960px) {
+  .product-top { grid-template-columns: 1fr; gap: 1.5rem; }
+}
+
+/* ========= ЛЕВО: ГАЛЕРЕЯ ========= */
+.gallery-wrap { display: flex; flex-direction: column; gap: 0.85rem; position: sticky; top: 1rem; }
+@media (max-width: 960px) { .gallery-wrap { position: static; } }
+
+/* ⭐ ГЛАВНОЕ: object-fit: contain — КАРТИНКА НИКОГДА не «зажимается», вписана целиком! */
+.main-image {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  background: linear-gradient(135deg, #f8fafc 0%, #eef2f7 100%);
+  border-radius: 14px;
+  display: flex; align-items: center; justify-content: center;
+  padding: 1.25rem;
+  overflow: hidden;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+}
+.main-image--tall { aspect-ratio: 3 / 4; padding: 1.5rem 1rem; }
+.main-image :global(img),
+.main-image img {
+  max-width: 100%;
+  max-height: 100%;
+  width: auto !important;
+  height: auto !important;
+  object-fit: contain !important;
+  display: block;
+  border-radius: 8px;
+}
+
+/* Миниатюры: скролл */
+.thumbs-scroll {
+  width: 100%;
+  overflow-x: auto;
+  scroll-behavior: smooth;
+  padding-bottom: 4px;
+}
+.thumbs-inner {
+  display: flex;
+  gap: 0.6rem;
+}
+.thumb {
+  flex: 0 0 auto;
+  width: 100px;
+  height: 75px;
+  background: #fff;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 4px;
+  cursor: pointer;
+  transition: all 0.15s;
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
+}
+.main-image--tall ~ .thumbs-scroll .thumb,
+.gallery-wrap:has(.main-image--tall) .thumb { width: 72px; height: 96px; }
+.thumb img, .thumb :global(img) {
+  max-width: 100%; max-height: 100%;
+  width: auto !important; height: auto !important;
+  object-fit: contain !important; border-radius: 4px;
+}
+.thumb:hover { border-color: #fcd34d; transform: translateY(-2px); }
+.thumb.active { border-color: #f59e0b; background: #fffbeb; box-shadow: 0 0 0 3px #fef3c7; }
+
+/* ========= ПРАВО: ИНФО ========= */
+.info-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 1.75rem;
+  box-shadow: 0 2px 14px rgba(0,0,0,0.06);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.brand-pill {
+  align-self: flex-start;
+  background: #ede9fe;
+  color: #5b21b6;
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-weight: 600;
+  font-size: 0.82rem;
+}
+.product-title { margin: 0; font-size: clamp(1.35rem, 2vw, 1.8rem); font-weight: 900; line-height: 1.2; letter-spacing: -0.02em; color: #111827; }
+.top-meta { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.stock {
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.88rem;
+  width: fit-content;
+}
+.stock.ok { background: #dcfce7; color: #166534; }
+.stock.na { background: #fef3c7; color: #92400e; }
+.article-pill {
+  padding: 6px 12px; background: #f3f4f6; color: #4b5563; border-radius: 8px; font-size: 0.85rem;
+}
+
+/* H1 заголовок */
+.page-h1 { margin: 0 0 1.5rem; font-size: clamp(1.6rem, 2.6vw, 2.3rem); font-weight: 900; letter-spacing: -0.025em; color: #111827; line-height: 1.2; }
+
+/* Цена */
+.price-block {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.5rem;
+  padding: 0.25rem 0 0.5rem;
+  background: transparent;   /* ⭐ УБРАЛИ оранжевую плашку */
+  border-radius: 0;
+  border: none;              /* ⭐ УБРАЛИ рамку */
+}
+.price-main { 
+  font-size: clamp(2rem, 3.5vw, 3rem); 
+  font-weight: 900; 
+  color: #111827;            /* ⭐ Цена ЧЕРНАЯ, а не красная (если хотите красную — верните #b91c1c) */
+  letter-spacing: -0.03em; 
+  line-height: 1; 
+}
+.price-old { 
+  font-size: 1.2rem; 
+  text-decoration: line-through; 
+  color: #9ca3af; 
+  margin-top: -0.3rem;
+}
+.discount-badge {
+  position: absolute; 
+  top: -8px; 
+  right: 0;
+  background: #dc2626; 
+  color: #fff;
+  font-size: 0.88rem; 
+  font-weight: 800;
+  padding: 5px 12px; 
+  border-radius: 20px;
+}
+.price-vat-note {
+  width: 100%;
+  margin-top: 0.35rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid #e5e7eb;   /* ⭐ ТОНКАЯ СЕРАЯ ЛИНИЯ */
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #374151;                 /* ⭐ ЧЕРНЫЙ текст */
+  line-height: 1.4;
+}
+.price-no-vat { 
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 0.3rem;
+  font-size: 0.78rem;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.btn-primary {
+  display: block;
+  width: 100%;
+  margin-top: 0.5rem;
+  padding: 1rem 1.25rem;
+  background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 1.05rem;
+  font-weight: 700;
+  box-shadow: 0 4px 14px rgba(220,38,38,0.3);
+  transition: all 0.2s;
+}
+.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 22px rgba(220,38,38,0.45); }
+.btn-sub { margin: -0.4rem 0 0; font-size: 0.8rem; color: #6b7280; text-align: center; }
+
+.feature-list {
+  list-style: none; margin: 0.5rem 0 0; padding: 0.85rem 1rem;
+  background: #f9fafb; border-radius: 8px; border: 1px solid #e5e7eb;
+  display: flex; flex-direction: column; gap: 0.35rem;
+}
+.feature-list li { font-size: 0.88rem; color: #374151; }
+
+/* =========================== 2) НИЖНЯЯ ЧАСТЬ =========================== */
+.product-bottom { display: flex; flex-direction: column; gap: 2.5rem; }
+.bottom-section { width: 100%; }
+.h2-section { margin: 0 0 0.35rem; font-size: clamp(1.3rem, 2vw, 1.6rem); font-weight: 800; letter-spacing: -0.02em; color: #111827; }
+.sec-sub { margin: 0 0 1.25rem; color: #6b7280; font-size: 0.95rem; }
+
+.about-product {
+  padding: 1.5rem 1.75rem;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  color: #374151;
+  line-height: 1.65;
+}
+.about-product :global(p) { margin: 0.5rem 0; }
+.about-product :global(h3), .about-product :global(h4) { margin: 1.1rem 0 0.4rem; color: #111827; }
+.about-product :global(ul) { padding-left: 1.25rem; }
+.about-product :global(li) { margin: 0.2rem 0; }
+
+/* Характеристики */
+.chars-wrap { overflow: hidden; border-radius: 12px; border: 1px solid #e5e7eb; background: #fff; }
+.chars-table { width: 100%; border-collapse: collapse; }
+.chars-table tr { border-bottom: 1px solid #f3f4f6; }
+.chars-table tr:last-child { border-bottom: none; }
+.chars-table td { padding: 0.8rem 1.15rem; font-size: 0.94rem; vertical-align: top; }
+.ch-name { width: 55%; color: #6b7280; background: #fafafa; }
+.ch-value { color: #111827; }
+
+/* Сопутствующие */
+.related-scroll { overflow-x: auto; scroll-behavior: smooth; padding-bottom: 6px; }
+.related-inner { display: flex; gap: 1rem; }
+.related-card {
+  flex: 0 0 auto;
+  width: 230px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  overflow: hidden;
+  text-decoration: none;
+  color: inherit;
+  display: flex; flex-direction: column;
+  transition: all 0.2s;
+}
+.related-card:hover { transform: translateY(-4px); box-shadow: 0 12px 28px rgba(0,0,0,0.12); border-color: #fcd34d; }
+.rel-img {
+  aspect-ratio: 4/3;
+  background: linear-gradient(135deg, #f8fafc 0%, #eef2f7 100%);
+  display: flex; align-items: center; justify-content: center;
+  padding: 0.75rem;
+}
+.rel-img :global(img), .rel-img img {
+  max-width: 100%; max-height: 100%;
+  width: auto !important; height: auto !important;
+  object-fit: contain !important;
+}
+.rel-body { padding: 0.75rem 0.9rem 1rem; display: flex; flex-direction: column; gap: 0.25rem; flex: 1; }
+.rel-cat { font-size: 0.7rem; text-transform: uppercase; color: #6b7280; font-weight: 600; letter-spacing: 0.05em; }
+.rel-title { font-size: 0.88rem; font-weight: 700; line-height: 1.3; color: #111827; min-height: 2.7em; }
+.rel-price { margin-top: auto; font-weight: 800; font-size: 1.05rem; color: #b91c1c; }
+
+/* ========= Модалка ========= */
+.modal { position: fixed; inset: 0; width: 100%; height: 100%; background: rgba(15,23,42,0.65); display: flex; align-items: center; justify-content: center; z-index: 2000; backdrop-filter: blur(2px); }
+.modal-content { background: #fff; padding: 1.75rem 1.75rem 1.5rem; border-radius: 14px; width: 90%; max-width: 460px; position: relative; box-shadow: 0 25px 60px rgba(0,0,0,0.4); animation: popin 0.2s ease-out; }
+@keyframes popin { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.close { position: absolute; top: 12px; right: 16px; font-size: 1.75rem; cursor: pointer; color: #9ca3af; line-height: 1; }
+.close:hover { color: #111827; }
+.modal h2 { margin: 0 0 1.1rem; font-size: 1.25rem; font-weight: 800; }
+.modal h2 span { color: #b91c1c; }
+.modal input, .modal textarea {
+  width: 100%; margin-bottom: 0.8rem; padding: 0.8rem 0.95rem;
+  border: 1px solid #e5e7eb; border-radius: 8px; font-size: 0.95rem; box-sizing: border-box;
+  font-family: inherit; transition: border-color 0.15s;
+}
+.modal input:focus, .modal textarea:focus { outline: none; border-color: #f59e0b; box-shadow: 0 0 0 3px #fef3c7; }
+.modal textarea { min-height: 88px; resize: vertical; }
+.modal .btn-primary { margin-top: 0.4rem; font-size: 1rem; padding: 0.9rem; }
+.form-law { margin: 0.6rem 0 0; font-size: 0.75rem; color: #9ca3af; text-align: center; }
 </style>
 
 <script>
-  document.addEventListener('DOMContentLoaded', () => {
-    const btn = document.getElementById('contact-btn');
-    const modal = document.getElementById('contact-modal');
-    if (!btn || !modal) return;
+/**
+ * ⚠️ ВАНИЛЬНЫЙ JS — БЕЗ ЗАВИСИМОСТЕЙ
+ * 1) Переключение большой картинки по клику на миниатюру
+ * 2) Модалка заявки
+ */
+document.addEventListener('DOMContentLoaded', () => {
 
-    const close = modal.querySelector('.close');
-    const form = document.getElementById('contact-form');
+  // ===== 1) Галерея: клик по миниатюре =====
+  const mainBox = document.getElementById('main-image-box');
+  const mainImg = document.getElementById('product-main-image');
+  const thumbs = document.querySelectorAll<HTMLButtonElement>('.thumb');
+  if (mainImg && thumbs.length > 0) {
+    // Запоминаем исходные атрибуты первого фото (srcset и т.д. для Image) — не нужно,
+    // т.к. Astro:assets отдает <img src="..." srcset="..." sizes="...">. Мы просто заменяем src/srcset.
+    const originals: { src: string | null; srcset: string | null; sizes: string | null; data: any }[] = [];
+    thumbs.forEach((btn) => {
+      const pic = btn.querySelector('img');
+      // Для картинки миниатюры astro:assets подставляет srcset тоже.
+      // Но нам нужен БОЛЬШОЙ вариант. В нашем случае один и тот же импорт — thumb и big используют одну и ту же исходную картинку,
+      // а Image генерирует свои srcset. Быстрее всего: вытащить src из thumb_img, заменить на /_astro/ большого аналога.
+      // АЛГОРИТМ: в data-main у главного img хранится исходный src. Миниатюра — содержит тот же путь,
+      // поэтому просто скопируем srcset главного с заменой aspect ratio не нужно — наш контейнер contain.
+      // ⭐ Самый простой и стабильный подход — ОБМЕН атрибутами:
+      originals.push({
+        src: pic?.getAttribute('src') || null,
+        srcset: pic?.getAttribute('srcset') || null,
+        sizes: pic?.getAttribute('sizes') || null,
+        data: pic
+      });
 
-    btn.addEventListener('click', () => { modal.style.display = 'flex'; });
-    close?.addEventListener('click', () => { modal.style.display = 'none'; });
-    window.addEventListener('click', (e) => {
-      if (e.target === modal) modal.style.display = 'none';
+      btn.addEventListener('click', () => {
+        const tImg = btn.querySelector('img');
+        if (!tImg || !mainImg) return;
+        // ✅ Просто копируем src + srcset + sizes с миниатюры (один и тот же asset).
+        // astro:assets сгенерировал для Image несколько размеров — они подойдут и как big.
+        const src = tImg.getAttribute('src');
+        const srcset = tImg.getAttribute('srcset');
+        const sizes = tImg.getAttribute('sizes');
+        if (src) mainImg.setAttribute('src', src);
+        if (srcset) mainImg.setAttribute('srcset', srcset);
+        if (sizes) mainImg.setAttribute('sizes', sizes);
+        mainImg.removeAttribute('width');
+        mainImg.removeAttribute('height');
+        // АКТИВНЫЙ СТИЛЬ
+        thumbs.forEach((b) => b.classList.remove('active'));
+        btn.classList.add('active');
+      });
     });
+  }
+
+  // ===== 2) Модалка =====
+  const btn = document.getElementById('contact-btn');
+  const modal = document.getElementById('contact-modal');
+  const closeBtn = document.getElementById('modal-close');
+  const form = document.getElementById('contact-form');
+  if (btn && modal) {
+    const open = () => { modal.style.display = 'flex'; document.body.style.overflow = 'hidden'; };
+    const shut = () => { modal.style.display = 'none'; document.body.style.overflow = ''; };
+    btn.addEventListener('click', open);
+    closeBtn?.addEventListener('click', shut);
+    window.addEventListener('keydown', (e) => { if (e.key === 'Escape') shut(); });
+    modal.addEventListener('click', (e) => { if (e.target === modal) shut(); });
     form?.addEventListener('submit', (e) => {
       e.preventDefault();
-      alert('Спасибо! Мы свяжемся с вами.');
-      modal.style.display = 'none';
+      // TODO: здесь подключить реальную отправку на почту / Telegram API / Formspree
+      alert('✅ Спасибо! Ваша заявка принята. Менеджер свяжется с вами в течение 15 минут.');
+      shut();
     });
-  });
+  }
+});
 </script>

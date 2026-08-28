@@ -1,11 +1,46 @@
 ---
 import Layout from '../../layouts/Layout.astro';
-import products from '../../data/products.json';
-import { categoryToSlug, getMainCategory } from '../../utils/transliterate';
+import { Image } from 'astro:assets';
+import { getAllProducts } from '../../utils/load-products';
+import { categoryToSlug, getMainCategory, transliterate } from '../../utils/transliterate';
+import { getProductImage } from '../../utils/image-loader';
+
+// ===== Hero-картинки категорий (уже оптимизированы astro:assets) =====
+import kvadrociklyImg from '../../assets/images/categories/kvadrocikly.jpg';
+import snegohodyImg from '../../assets/images/categories/snegohody.jpg';
+import lodkiImg from '../../assets/images/categories/lodki.jpg';
+import lodMotoryImg from '../../assets/images/categories/lodochnye-motory.jpg';
+import zapchastiImg from '../../assets/images/categories/zapchasti.jpg';
+import aksessuaryImg from '../../assets/images/categories/aksessuary.jpg';
+import ekipirovkaImg from '../../assets/images/categories/ekipirovka.jpg';
+import serviceImg from '../../assets/images/categories/service.jpg';
+import placeholderImg from '../../assets/images/categories/placeholder.jpg';
+
+const CATEGORY_HERO: Record<string, any> = {
+  kvadrocikly: kvadrociklyImg,
+  snegohody: snegohodyImg,
+  lodki: lodkiImg,
+  'lodochnye-motory': lodMotoryImg,
+  zapchasti: zapchastiImg,
+  aksessuary: aksessuaryImg,
+  ekipirovka: ekipirovkaImg,
+  service: serviceImg,
+};
+
+const CATEGORY_SUBTITLE: Record<string, string> = {
+  kvadrocikly: 'Официальный дилер AODES, Segway, STELS, Gladiator, Tinger.',
+  snegohody: 'Снегоходы AODES и STELS для рыбалки, охоты и активного отдыха.',
+  lodki: 'ПВХ лодки Gladiator — от рыбацких до моторных RIB.',
+  'lodochnye-motory': 'Лодочные моторы Gladiator, Parsun, Golfstream — 2-х и 4-тактные.',
+  zapchasti: 'Оригинальные запчасти для всей техники в наличии и под заказ.',
+  aksessuary: 'Аксессуары для квадроциклов, снегоходов и лодок.',
+  ekipirovka: 'Экипировка и защитная одежда для мотоспорта.',
+  service: 'Сервисный центр — ремонт и ТО всей мототехники.',
+};
 
 export function getStaticPaths() {
-  const mainCategories = [...new Set(products.map(p => getMainCategory(p.category)).filter(Boolean))];
-  console.log('Категории для генерации:', mainCategories); // ← добавьте эту строку
+  const all = getAllProducts();
+  const mainCategories = [...new Set(all.map(p => getMainCategory(p.category)).filter(Boolean))];
   return mainCategories.map(cat => ({
     params: { category: categoryToSlug(cat) },
     props: { category: cat }
@@ -13,44 +48,263 @@ export function getStaticPaths() {
 }
 
 const { category } = Astro.props;
+const categorySlug = categoryToSlug(category);
+const heroImg = CATEGORY_HERO[categorySlug] || placeholderImg;
+const heroSubtitle = CATEGORY_SUBTITLE[categorySlug] || 'Большой выбор, гарантия, доставка по РФ.';
 
-const productsInCategory = products.filter(p => getMainCategory(p.category) === category);
+const allProducts = getAllProducts();
+const productsInCategory = allProducts.filter(p => getMainCategory(p.category) === category);
 
-const brandSlugs = [...new Set(productsInCategory.map(p => p.brandSlug).filter(Boolean))];
-const brandsInCategory = brandSlugs.map(slug => {
-  const found = productsInCategory.find(p => p.brandSlug === slug);
-  const title = found
-    ? (found.category?.split('>>>')[1]?.split(';')[0]?.trim() || found.brand || 'Бренд')
-    : slug;
-  return { title, slug };
-});
+// ===== ФОРМИРУЕМ СПИСОК БРЕНДОВ КАК ВЫ ПРОСИЛИ =====
+// Группируем по «Подкатегория>>>Бренд»
+interface BrandItem {
+  title: string;       // например «Квадроциклы AODES»
+  slug: string;        // brandSlug из товара
+  count: number;       // кол-во товаров
+  preview: any | null; // картинка превью первого товара
+}
+
+// ====== Нормализация названия бренда (фикс двойных «ы» и един.число/мн.число) ======
+// Приводим все варианты к ОДНОМУ виду:
+//   «Квадроцикл AODES» → «Квадроциклы AODES»
+//   «Квадроциклы AODES» → «Квадроциклы AODES»
+//   «Квадроциклыы AODES» → «Квадроциклы AODES»
+//   «Мотовездеход AODES» → «Мотовездеходы AODES»
+//   «Мотовездеходы AODES» → «Мотовездеходы AODES»
+function normalizeBrandTitle(raw: string): string {
+  let s = (raw || '').trim();
+  if (!s) return 'Бренд';
+  // Дубли букв: «Квадроциклыы» → «Квадроциклы»
+  s = s.replace(/(квадроцикл)[ыы]+\s*/gi, '$1ы ');
+  s = s.replace(/(мотовездеход)[ыы]+\s*/gi, '$1ы ');
+  s = s.replace(/(снегоход)[ыы]+\s*/gi, '$1ы ');
+  s = s.replace(/(лодочн.*мотор)[ыы]+\s*/gi, '$1ы ');
+  s = s.replace(/(лодка)[иыы]+\s*/gi, '$1и ');
+  s = s.replace(/(вездеход)[ыы]+\s*/gi, '$1ы ');
+  // Единственное число → мн.ч. (Квадроцикл X → Квадроциклы X)
+  s = s.replace(/^Квадроцикл\s+/i, 'Квадроциклы ');
+  s = s.replace(/^Мотовездеход\s+/i, 'Мотовездеходы ');
+  s = s.replace(/^Снегоход\s+/i, 'Снегоходы ');
+  s = s.replace(/^Лодочный\s*мотор\s+/i, 'Лодочные моторы ');
+  s = s.replace(/^Лодка\s+/i, 'Лодки ');
+  s = s.replace(/^Вездеход\s+/i, 'Вездеходы ');
+  // Обрезаем лишние множественные пробелы
+  s = s.replace(/\s+/g, ' ').trim();
+  // Если категория вида «Лодочные моторы Parsun» (уже мн.ч) — оставляем
+  // Если категория вида «Лодочный мотор Parsun» — уже заменили выше на «Лодочные моторы Parsun»
+  return s;
+}
+
+// ====== Нормализованный ключ для дедупликации ======
+// Убираем все пробелы/дефисы/регистр — «Квадроциклы AODES» и «Квадроцикл AODES» и «Квадроцикл АОДЕС» → одинаковый ключ
+function dedupeKey(title: string): string {
+  return transliterate(title || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '');
+}
+
+// ======= ПОСТРОЕНИЕ СПИСКА БРЕНДОВ (try/catch — страница никогда не падает) =======
+let brands: BrandItem[] = [];
+let buildError: string | null = null;
+
+try {
+  const brandByDedupeKey = new Map<string, BrandItem>();
+
+  for (let idx = 0; idx < productsInCategory.length; idx++) {
+    const product = productsInCategory[idx];
+    if (!product) continue;
+
+    try {
+      const parts = String(product.category || '').split('>>>');
+      const subCatRaw = (parts[1] || '').split(';')[0].trim();
+      const catBase = category.replace(/[ыи]$/, '');
+      const brandTitleRaw = subCatRaw || (product.brand ? `${catBase} ${product.brand}` : 'Бренд');
+      const brandTitle = normalizeBrandTitle(brandTitleRaw);
+      const slug = String(product.brandSlug || '').trim();
+      if (!slug) continue;
+
+      const key = dedupeKey(brandTitle);
+
+      if (!brandByDedupeKey.has(key)) {
+        const photoRaw = product.photo?.[0];
+        let preview = null;
+        if (photoRaw) {
+          try { preview = getProductImage(photoRaw, 'technique'); } catch (_i) { /* noop */ }
+        }
+        brandByDedupeKey.set(key, { title: brandTitle, slug, count: 0, preview });
+      }
+
+      const item = brandByDedupeKey.get(key)!;
+      item.count += 1;
+      if (item.slug.length > slug.length && slug.length > 0) item.slug = slug;
+
+      if (!item.preview && product.photo?.[0]) {
+        try { item.preview = getProductImage(product.photo[0], 'technique'); } catch (_i) { /* noop */ }
+      }
+    } catch (e) {
+      console.warn(`[category] Ошибка обработки товара #${idx} (${product.title}):`, e);
+    }
+  }
+
+  brands = Array.from(brandByDedupeKey.values()).sort((a, b) => a.title.localeCompare(b.title, 'ru'));
+  console.log(`[category] ${category}: найдено брендов ${brands.length}, товаров ${productsInCategory.length}`);
+} catch (e) {
+  buildError = String(e);
+  console.error(`[category] ❌ Критическая ошибка сборки брендов для ${category}:`, e);
+  brands = [];
+}
 ---
 
-<Layout title={category}>
-  <h1>{category}</h1>
-  <p>Выберите бренд:</p>
-  <div class="brands-grid">
-    {brandsInCategory.length > 0 ? (
-      brandsInCategory.map(brand => (
-        <a href={`/catalog/${categoryToSlug(category)}/${brand.slug}`} class="brand-card">
-          {brand.title}
-        </a>
-      ))
+<Layout title={category} description={heroSubtitle} heroImage={heroImg} heroSubtitle={heroSubtitle}>
+  <!-- ⭐ ЯВНЫЙ БЕЛЫЙ ФОН — ЧТОБЫ НЕ БЫЛО ЖЕЛТОГО ПОД КАРТОЧКАМИ БРЕНДОВ -->
+  <div class="container container--py" style="background: #ffffff;">
+    <nav class="breadcrumb">
+      <a href="/">Главная</a> /
+      <a href="/catalog">Каталог</a> /
+      <span>{category}</span>
+    </nav>
+
+    {brands.length === 0 ? (
+      <div class="empty">
+        <p><strong>⚠️ Нет брендов для отображения.</strong></p>
+        <p>Найдено товаров в категории «{category}»: <code>{productsInCategory.length}</code></p>
+        {productsInCategory.length > 0 && (
+          <div style="text-align:left; max-width:800px; margin:1rem auto; background:#fff; padding:1rem; border-radius:8px; overflow:auto; max-height:300px; font-size:0.85rem; color:#374151;">
+            <p style="margin:0 0 0.5rem; font-weight:700;">Первые 5 товаров для диагностики:</p>
+            {productsInCategory.slice(0, 5).map((p: any, i: number) => (
+              <div key={i} style="border-bottom:1px solid #eee; padding:0.5rem 0;">
+                <div><strong>#{i + 1} {p.title}</strong></div>
+                <div>category: <code>{p.category || '(пусто)'}</code></div>
+                <div>brand: <code>{p.brand || '(пусто)'}</code> · brandSlug: <code>{p.brandSlug || '(пусто)'}</code> · modelSlug: <code>{p.modelSlug || '(пусто)'}</code></div>
+                <div>photo[0]: <code>{p.photo?.[0] || '(нет фото)'}</code></div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     ) : (
-      <p>В этой категории пока нет товаров.</p>
+      <>
+        <h2 class="section-title">Модельный ряд {category.toLowerCase()}</h2>
+        <p class="section-subtitle">Всего товаров в категории: <strong>{productsInCategory.length}</strong></p>
+
+        <div class="brands-grid">
+          {brands.map(brand => (
+            <a href={`/catalog/${categorySlug}/${brand.slug}`} class="brand-card" title={brand.title}>
+              <div class="brand-card__img">
+                {brand.preview ? (
+                  // ⭐ БЕЗ ВСЯКИХ object-fit: width 100% height auto — ЕСТЕСТВЕННЫЙ ВИД
+                  <img
+                    src={typeof brand.preview === 'string' ? brand.preview : brand.preview.src}
+                    srcset={typeof brand.preview !== 'string' ? (brand.preview.srcset || '') : ''}
+                    sizes={typeof brand.preview !== 'string' ? (brand.preview.sizes || '') : ''}
+                    alt={brand.title}
+                    loading="lazy"
+                    decoding="async"
+                  />
+                ) : (
+                  <div class="ph">
+                    <span>🚜</span>
+                    <small>Фото скоро появится</small>
+                  </div>
+                )}
+              </div>
+              <div class="brand-card__info">
+                <h3>{brand.title}</h3>
+                <span class="count">{brand.count} {brand.count === 1 ? 'модель' : brand.count < 5 ? 'модели' : 'моделей'} в наличии</span>
+                <span class="arrow">Смотреть модели →</span>
+              </div>
+            </a>
+          ))}
+        </div>
+      </>
     )}
   </div>
 </Layout>
 
 <style>
-  .brands-grid { display: flex; flex-wrap: wrap; gap: 1rem; padding: 1rem; }
-  .brand-card {
-    padding: 1rem 2rem;
-    border: 1px solid #ddd;
-    border-radius: 8px;
-    text-decoration: none;
-    color: #333;
-    transition: background 0.2s;
+  .section-title { font-size: 2rem; font-weight: 800; margin-bottom: 0.3rem; letter-spacing: -0.02em; }
+  .section-subtitle { color: #6b7280; margin-bottom: 2rem; font-size: 1rem; }
+  .section-subtitle strong { color: #1a2027; }
+
+  .empty { padding: 4rem 0; text-align: center; color: #6b7280; font-size: 1.1rem; }
+
+  /* ============== УВЕЛИЧЕННЫЕ карточки брендов (3 в ряд) ============== */
+  .brands-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1.5rem;
   }
-  .brand-card:hover { background: #f5f5f5; }
+  @media (max-width: 1100px) { .brands-grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 600px)  { .brands-grid { grid-template-columns: 1fr; gap: 1.2rem; } }
+
+  .brand-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    background: #ffffff;
+    border-radius: 14px;
+    overflow: hidden;
+    border: 1px solid #eef0f3;
+    box-shadow: 0 4px 18px rgba(17,24,39,0.08);
+    text-decoration: none;
+    color: inherit;
+    transition: transform 0.25s ease-out, box-shadow 0.25s ease-out, border-color 0.2s;
+    height: 100%;   /* ⭐ ФИКС ВЫСОТЫ: ВСЕ КАРТОЧКИ В РЯДУ ОДИНАКОВЫЕ */
+  }
+  .brand-card:hover {
+    transform: translateY(-6px);
+    box-shadow: 0 20px 45px rgba(17,24,39,0.16);
+    border-color: #fcd34d;
+  }
+  .brand-card:hover .arrow { color: #b45309; }
+
+  /* ════════════════════════════════════════════════════════════
+     ⭐⭐⭐ ВСЕ КАРТИНКИ БРЕНДОВ ОДИНАКОВОЙ ВЫСОТЫ (ЗАГОЛОВКИ НА ОДНОЙ ЛИНИИ!)
+     aspect-ratio задает рамку. Меняйте если нужно:
+     4/3 = классика (как сейчас)
+     3/2 = шире
+     16/9 = очень широкая
+     ════════════════════════════════════════════════════════════ */
+  .brand-card__img {
+    width: 100%;
+    background: #ffffff;
+    overflow: hidden;
+    padding: 10px;            /* 👈 ОТСТУП ВОКРУГ КАРТИНКИ. 0 = без поля */
+    aspect-ratio: 4 / 3;      /* 👈 ФОРМА РАМКИ (ВСЕ КАРТОЧКИ ОДИНАКОВЫ!) */
+    display: flex;
+    align-items: center;      /* центрируем ВЕРТИКАЛЬНО */
+    justify-content: center;  /* центрируем ГОРИЗОНТАЛЬНО */
+    flex: none;
+  }
+  .brand-card__img img {
+    display: block;
+    width: auto;             /* ⭐ не на всю ширину! вписывается в рамку */
+    height: auto;
+    max-width: 100%;         /* но не шире рамки */
+    max-height: 100%;        /* и не выше рамки */
+    border-radius: 8px;
+    transition: transform 0.35s ease-out;
+  }
+  .brand-card:hover .brand-card__img img { transform: scale(1.05); }
+
+  /* заглушка — ТОЖЕ САМАЯ ВЫСОТА! */
+  .brand-card__img .ph {
+    width: 100%;
+    height: 100%;
+    aspect-ratio: 4 / 3;     /* ⭐ та же самая форма, что и у реальной картинки */
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 0.5rem;
+    background: linear-gradient(135deg, #fff7ed, #fef3c7);
+    color: #92400e;
+    border-radius: 8px;
+    box-sizing: border-box;
+  }
+  .brand-card__img .ph span { font-size: 3rem; line-height: 1; }
+  .brand-card__img .ph small { font-size: 0.78rem; }
+
+  .brand-card__info { padding: 1rem 1.25rem 1.25rem; border-top: 1px solid #f1f2f4; display:flex; flex-direction:column; flex:1; }
+  .brand-card__info h3 { font-size: 1.05rem; font-weight: 800; margin: 0 0 0.35rem; line-height: 1.3; color: #111827; min-height: 2.7rem; } /* ⭐ мин-высота для выравнивания если 2 строки или 1 */
+  .count { display: block; color: #6b7280; font-size: 0.82rem; margin-bottom: 0.8rem; }
+  .arrow { color: #f59e0b; font-weight: 700; font-size: 0.9rem; transition: color 0.2s; margin-top: auto; }
 </style>
