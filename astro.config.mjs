@@ -21,6 +21,10 @@ export default defineConfig({
   // и браузер получит 404 HTML вместо картинки → сайт без стилей/изображений (только текст!).
   // КОГДА ПЕРЕНОСИМ НА mirmotorov24.ru (кастомный домен, корень сайта) — ЗАКОММЕНТИРУЙТЕ base: ниже!
   base: '/mirmotorov-astro/',
-  trailingSlash: 'ignore',
+  // GitHub Pages Static Hosting обслуживает только /catalog/index.html по URL /catalog/ (С / В КОНЦЕ!)
+  // Если URL /catalog без / — GH Pages выдаёт 404!
+  // trailingSlash: 'always' — Astro ВСЕГДА ДОБАВЛЯЕТ / в конце. Все страницы = /catalog/.
+  // Также Astro <Link href="/catalog"> редиректит автоматически на /catalog/.
+  trailingSlash: 'always',
 });
 
