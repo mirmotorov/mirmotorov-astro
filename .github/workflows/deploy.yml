@@ -32,10 +32,10 @@ jobs:
           cache: npm
 
       - name: Установка зависимостей
-        run: npm ci
+        run: npm ci --engine-strict=false
 
       - name: Сборка сайта (Astro SSG)
-        run: npm run build
+        run: npm run build -- --site "https://mirmotorov.github.io/mirmotorov-astro"
 
       - name: Загрузка артефакта Pages
         uses: actions/upload-pages-artifact@v3
