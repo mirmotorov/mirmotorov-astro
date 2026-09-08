@@ -1,18 +1,53 @@
 User-agent: *
-Allow: /
-Disallow: /admin
-Disallow: /private
+Disallow: /
 
-# Яндекс
-User-agent: Yandex
-Allow: /
-Clean-param: utm_source&utm_medium&utm_campaign&utm_content&utm_term /
-Sitemap: https://mirmotorov24.ru/sitemap-index.xml
-
-# Google
 User-agent: Googlebot
-Allow: /
-Sitemap: https://mirmotorov24.ru/sitemap-index.xml
+Disallow: /
 
-Host: https://mirmotorov24.ru
-Sitemap: https://mirmotorov24.ru/sitemap-index.xml
+User-agent: Yandex
+Disallow: /
+
+User-agent: YandexImages
+Disallow: /
+
+User-agent: YandexVideo
+Disallow: /
+
+User-agent: Rambler
+Disallow: /
+
+User-agent: Mail.Ru
+Disallow: /
+
+User-agent: Yahoo
+Disallow: /
+
+User-agent: bingbot
+Disallow: /
+
+User-agent: DuckDuckBot
+Disallow: /
+
+User-agent: Applebot
+Disallow: /
+
+# =========================================================================
+# !!! ВНИМАНИЕ: ВРЕМЕННО! Сайт в тестировании на github.io домене. !!!
+# При переносе на основной домен mirmotorov24.ru — НУЖНО БУДЕТ:
+#   1. Удалить robots.txt (всё что выше!)
+#   2. Вставить этот ТЕСТОВЫЙ ЗАМЕНИТЬ НА ОСНОВНОЙ robots.txt:
+#
+#   User-agent: *
+#   Allow: /
+#   Disallow: /admin
+#   Disallow: /private
+#   User-agent: Yandex
+#   Allow: /
+#   Clean-param: utm_source&utm_medium&utm_campaign&utm_content&utm_term /
+#   Sitemap: https://mirmotorov24.ru/sitemap-index.xml
+#   User-agent: Googlebot
+#   Allow: /
+#   Sitemap: https://mirmotorov24.ru/sitemap-index.xml
+#   Host: https://mirmotorov24.ru
+#   Sitemap: https://mirmotorov24.ru/sitemap-index.xml
+# =========================================================================
