@@ -20,6 +20,7 @@ const COMPANY = {
     { label: 'MAX Мессенджер', href: 'https://max.ru/yourid',   text: 'MAX: мirmotorov24' },
   ],
 };
+import { u } from '../utils/_urls.astro';
 ---
 
 <section class="contact">
@@ -87,7 +88,7 @@ const COMPANY = {
           <button class="form__submit" type="submit">
             Отправить заявку
           </button>
-          <p class="form__note">Нажимая кнопку, вы соглашаетесь с <a href="/policy" target="_blank">политикой конфиденциальности</a> и обработкой персональных данных.</p>
+          <p class="form__note">Нажимая кнопку, вы соглашаетесь с <a href={u("/policy")} target="_blank">политикой конфиденциальности</a> и обработкой персональных данных.</p>
         </form>
       </div>
     </div>

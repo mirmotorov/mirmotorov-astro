@@ -1,14 +1,14 @@
 ---
 import vkIcon from '../assets/images/icon/vk.jpg';
 import maxIcon from '../assets/images/icon/max.jpg';
+import { u } from '../utils/_urls.astro';
 const currentPath = Astro.url.pathname;
-const isActive = (path) => currentPath === path ? 'active' : '';
----
+const isActive = (path) => currentPath === path ? 'active' : '';---
 
 <div class="header-wrapper">
   <header class="header">
     <div class="header__top">
-      <a href="/" class="header__logo">Мир моторов</a>
+      <a href={u("/")} class="header__logo">Мир моторов</a>
       <form class="header__search" action="/search" method="get">
         <input type="text" name="q" placeholder="Поиск по сайту..." class="search__input" />
         <button type="submit" class="search__btn">Поиск</button>
@@ -32,32 +32,32 @@ const isActive = (path) => currentPath === path ? 'active' : '';
         <a href="https://max.ru/yourid" class="action-icon action-icon--max" target="_blank" rel="noopener" title="MAX Мессенджер" aria-label="MAX Мессенджер">
           <img src={maxIcon.src} alt="MAX Мессенджер" width="40" height="40" />
         </a>
-        <a href="/cart" class="header__cart action-icon" aria-label="Корзина" title="Корзина">
+        <a href={u("/cart")} class="header__cart action-icon" aria-label="Корзина" title="Корзина">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>
         </a>
         <a href="tel:+73912720555" class="phone-text-btn" title="Позвонить нам сейчас">8 (391)&nbsp;272‑05‑55</a>
       </div>
     </div>
     <nav class="header__nav">
-      <a href="/catalog" class={`nav__btn nav__btn--catalog ${isActive('/catalog')}`}>Каталог</a>
+      <a href={u("/catalog")} class={`nav__btn nav__btn--catalog ${isActive('/catalog')}`}>Каталог</a>
       <div class="nav__dropdown">
         <button class="nav__link">Владельцам</button>
         <div class="dropdown__content">
-          <a href="/tuning">Тюнинг</a>
-          <a href="/service">Сервис и ремонт</a>
-          <a href="/paper">Полезные статьи</a>
+          <a href={u("/tuning")}>Тюнинг</a>
+          <a href={u("/service")}>Сервис и ремонт</a>
+          <a href={u("/paper")}>Полезные статьи</a>
         </div>
       </div>
       <div class="nav__dropdown">
         <button class="nav__link">Покупателям</button>
         <div class="dropdown__content">
-          <a href="/promos">Акции</a>
-          <a href="/leasing">Лизинг для Юридических лиц</a>
-          <a href="/credit">Рассрочка и кредитование</a>
-          <a href="/dostavka-i-oplata">Доставка и оплата</a>
+          <a href={u("/promos")}>Акции</a>
+          <a href={u("/leasing")}>Лизинг для Юридических лиц</a>
+          <a href={u("/credit")}>Рассрочка и кредитование</a>
+          <a href={u("/dostavka-i-oplata")}>Доставка и оплата</a>
         </div>
       </div>
-      <a href="/aboutus" class={`nav__link ${isActive('/aboutus')}`}>О нас</a>
+      <a href={u("/aboutus")} class={`nav__link ${isActive('/aboutus')}`}>О нас</a>
     </nav>
   </header>
 </div>

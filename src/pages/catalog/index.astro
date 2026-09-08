@@ -3,6 +3,7 @@ import Layout from '../../layouts/Layout.astro';
 import categories from '../../data/categories.json';
 import { categoryToSlug } from '../../utils/transliterate';
 
+import { u } from '../../utils/_urls.astro';
 // ──────────────────────────────────────────────────────────────────────────
 //  ⭐⭐⭐ ТОЧНО ТАК ЖЕ КАК CategoryCards.astro — ОНИ РАБОТАЮТ НА ГЛАВНОЙ!
 // ──────────────────────────────────────────────────────────────────────────
@@ -39,14 +40,13 @@ const list = categories.map((cat: any) => {
 });
 
 const seoTitle = 'Каталог мототехники Мир Моторов 24 — Красноярск';
-const seoDescr = 'Квадроциклы AODES, Segway, STELS, Tinger. Снегоходы, лодки, лодочные моторы Parsun, Gladiator, Golfstream. Официальный дилер, гарантия. Купить с доставкой по РФ.';
----
+const seoDescr = 'Квадроциклы AODES, Segway, STELS, Tinger. Снегоходы, лодки, лодочные моторы Parsun, Gladiator, Golfstream. Официальный дилер, гарантия. Купить с доставкой по РФ.';---
 
 <Layout title={seoTitle} description={seoDescr} heroTitle="🛒 Каталог мототехники" heroSubtitle="8 категорий: Квадроциклы, Снегоходы, Лодки, Моторы, Запчасти, Аксессуары, Экипировка, Сервис. Оригиналы с гарантией.">
   <div class="wrap">
     <!-- Хлебные крошки -->
     <nav class="crumbs">
-      <a href="/">Главная</a> / <span>Каталог</span>
+      <a href={u("/")}>Главная</a> / <span>Каталог</span>
     </nav>
 
     <h1 class="title">Вся мототехника — в наличии и под заказ</h1>

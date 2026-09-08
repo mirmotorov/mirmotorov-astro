@@ -278,14 +278,13 @@ function anyFilterActive(): boolean {
   return !!(qpPrice || qpCC || qpTact || qpPower || qpControl || qpPropulsion || qpTrack || qpBoatType || qpFloorType);
 }
 
-const layoutClass = brandProducts.length > 0 ? 'layout-with-filters' : '';
----
+const layoutClass = brandProducts.length > 0 ? 'layout-with-filters' : '';---
 
 <Layout title={`${brandTitle} — купить в Красноярске по цене от ${minPrice.toLocaleString()} ₽`} description={subtitle} heroImage={heroImg} heroSubtitle={subtitle}>
   <div class="container container--py">
     <nav class="breadcrumb">
-      <a href="/">Главная</a> /
-      <a href="/catalog">Каталог</a> /
+      <a href={u("/")}>Главная</a> /
+      <a href={u("/catalog")}>Каталог</a> /
       <a href={`/catalog/${mainCatSlug}`}>{mainCatTitle}</a> /
       <span>{brandTitle}</span>
     </nav>

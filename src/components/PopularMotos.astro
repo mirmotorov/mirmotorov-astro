@@ -1,13 +1,12 @@
 ---
 import popularMotos from '../data/products.json';
-import MotoCard from './MotoCard.astro';
----
+import MotoCard from './MotoCard.astro';---
 <section class="popular">
   <h2>Популярная техника</h2>
   <div class="grid">
     {popularMotos.map(moto => <MotoCard moto={moto} />)}
   </div>
-  <a href="/catalog" class="btn-all">Смотреть весь каталог →</a>
+  <a href={u("/catalog")} class="btn-all">Смотреть весь каталог →</a>
 </section>
 
 <style>

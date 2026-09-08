@@ -1,29 +1,22 @@
 ---
 import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
+import { u } from '../utils/_urls.astro';
 export interface Props {
   title: string;
   description?: string;
   heroImage?: any;   // опционально: картинка hero-баннера
   heroSubtitle?: string;
 }
-const { title, description, heroImage, heroSubtitle } = Astro.props;
----
+const { title, description, heroImage, heroSubtitle } = Astro.props;---
 <!doctype html>
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <!-- ⚠️ BASE HREF = ВАЖНЕЙШАЯ СТРОКА для GitHub Pages!
-    Astro config.base='/mirmotorov-astro/' добавляется К АССЕТАМ (картинки/CSS/JS), но НЕ к <a href>.
-    <base href={Astro.url.pathname.split('/').slice(0,-1).length ? '/' + Astro.url.pathname.split('/').filter(Boolean)[0] + '/' : import.meta.env.BASE_URL }>
-    — автоматически даёт браузеру префикс, который он добавит КО ВСЕМ относительным ссылкам <a href="/catalog">.
-    Тогда href="/catalog" → браузер открывает "/mirmotorov-astro/catalog/" — РАБОТАЕТ 404 НЕТ!
-    Если потом переносим на домен mirmotorov24.ru (base='/') — <base href="/">, ничего сломается! -->
-  <base href={import.meta.env.BASE_URL} />
-  <link rel="icon" type="image/x-icon" href="/favicon.ico" />
-  <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico" />
-  <link rel="apple-touch-icon" href="/favicon.ico" />
+  <link rel="icon" type="image/x-icon" href={u("/favicon.ico")} />
+  <link rel="shortcut icon" type="image/x-icon" href={u("/favicon.ico")} />
+  <link rel="apple-touch-icon" href={u("/favicon.ico")} />
   <meta name="robots" content="noindex, nofollow, noarchive, nosnippet, notranslate, noimageindex" />
   <meta name="googlebot" content="noindex, nofollow, noarchive, nosnippet, notranslate, noimageindex" />
   <meta name="yandex" content="noindex, nofollow, noarchive, nosnippet" />

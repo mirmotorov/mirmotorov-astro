@@ -16,6 +16,7 @@ import ekipirovkaImg from '../../assets/images/categories/ekipirovka.jpg';
 import serviceImg from '../../assets/images/categories/service.jpg';
 import placeholderImg from '../../assets/images/categories/placeholder.jpg';
 
+import { u } from '../../utils/_urls.astro';
 const CATEGORY_HERO: Record<string, any> = {
   kvadrocikly: kvadrociklyImg,
   snegohody: snegohodyImg,
@@ -152,15 +153,14 @@ try {
   buildError = String(e);
   console.error(`[category] ❌ Критическая ошибка сборки брендов для ${category}:`, e);
   brands = [];
-}
----
+}---
 
 <Layout title={category} description={heroSubtitle} heroImage={heroImg} heroSubtitle={heroSubtitle}>
   <!-- ⭐ ЯВНЫЙ БЕЛЫЙ ФОН — ЧТОБЫ НЕ БЫЛО ЖЕЛТОГО ПОД КАРТОЧКАМИ БРЕНДОВ -->
   <div class="container container--py" style="background: #ffffff;">
     <nav class="breadcrumb">
-      <a href="/">Главная</a> /
-      <a href="/catalog">Каталог</a> /
+      <a href={u("/")}>Главная</a> /
+      <a href={u("/catalog")}>Каталог</a> /
       <span>{category}</span>
     </nav>
 

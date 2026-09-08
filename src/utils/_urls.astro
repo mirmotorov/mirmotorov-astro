@@ -1,0 +1,73 @@
+---
+// src/utils/_urls.astro
+// Helper-функции для внутренних ссылок сайта — АВТОМАТИЧЕСКИ добавляют BASE_URL prefix и trailingSlash /
+// (BASE_URL = astro.config.mjs base:'/mirmotorov-astro/' для GitHub Pages!)
+//
+// НУЖНО ПОТОМУ ЧТО: Astro config.base='/mirmotorov-astro/' добавляется ТОЛЬКО к ассетам (картинкам/CSS/JS),
+// а к обычным <a href={u("/catalog")}> ссылкам — НЕ ДОБАВЛЯЕТСЯ! Поэтому href={u("/catalog")} на GitHub Pages
+// пытается открыть /catalog а не /mirmotorov-astro/catalog — 404!
+//
+// Использование: импортируйте в ЛЮБОМ .astro файле:
+//   ---
+//   import { u } from '../utils/_urls.astro';
+//   ---
+//   <a href={u('/catalog')}>Каталог</a>
+//   <a href={u('/catalog/kvadrocikly/kvadrocikly-aodes/pathcross-525l')}>Товар</a>
+//   <a href={u('/')}>Главная</a>
+//
+// Результат для GitHub Pages:
+//   u('/catalog')  ->  '/mirmotorov-astro/catalog/'
+//   u('/')         ->  '/mirmotorov-astro/'
+//   u('/policy')   ->  '/mirmotorov-astro/policy/'
+//
+// Внешние / mailto / tel / hash не трогаются!
+//   u('https://ya.ru')  -> 'https://ya.ru'
+//   u('tel:+7391...')    -> 'tel:+7391...'
+//   u('mailto:a@b.ru')   -> 'mailto:a@b.ru'
+//
+// ПРИ ПЕРЕНОСЕ НА mirmotorov24.ru (base: '/' — удаляем из конфига)
+// u('/catalog')   -> '/catalog/' — как и ожидается! НИЧЕГО МЕНЯТЬ НУЖНО НЕ БУДЕТ!
+
+const BASE_URL_RAW = import.meta.env.BASE_URL || '/';
+// Нормализуем: BASE_URL = '/mirmotorov-astro/' или '/'
+const B = BASE_URL_RAW.endsWith('/') ? BASE_URL_RAW.slice(0, -1) : BASE_URL_RAW; // '/mirmotorov-astro' или ''
+
+/**
+ * Преобразовать внутренний путь сайта в полный с BASE_URL и trailing slash (согласно astro.config trailingSlash=always)
+ * @param rawPath Например '/catalog' или '/catalog/kvadrocikly'
+ */
+export function u(rawPath: string | undefined | null): string {
+  if (rawPath === undefined || rawPath === null) return B ? B + '/' : '/';
+  const p = String(rawPath).trim();
+
+  // Внешние / особые ссылки — возвращаем как есть (НЕ ТРОГАЕМ!)
+  if (!p || p.startsWith('http:') || p.startsWith('https:') ||
+      p.startsWith('//') || p.startsWith('mailto:') || p.startsWith('tel:') ||
+      p.startsWith('javascript:') || p.startsWith('data:') || p.startsWith('#')) {
+    return p;
+  }
+
+  // Главная страница
+  if (p === '/' || p === '') {
+    return B ? B + '/' : '/';
+  }
+
+  // Путь с /?query=xxx
+  const [pathPart, queryAndHash] = p.split(/(?=[?#])/, 2) as [string, string?];
+
+  // Гарантируем leading /
+  const leading = pathPart.startsWith('/') ? pathPart : '/' + pathPart;
+  // trailing slash (always) — astro.config требует для GitHub Pages /catalog/ (а не /catalog)
+  const trailing = leading.endsWith('/') ? leading : leading + '/';
+
+  const full = (B || '') + trailing;
+  return queryAndHash ? full + queryAndHash : full;
+}
+
+/** То же самое что u(), но alias для ясности */
+export const url = u;
+export const to = u;
+export default u;
+---
+{/* Astro-компонент не рендерит HTML (это только helper). Создан как .astro потому что import.meta.env
+    доступен напрямую в frontmatter .astro файлов (в отличие от чистого .ts)! */}

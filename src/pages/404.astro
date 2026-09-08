@@ -1,6 +1,5 @@
 ---
-import Layout from '../layouts/Layout.astro';
----
+import Layout from '../layouts/Layout.astro';---
 
 <Layout title="Страница не найдена" description="Ошибка 404 — страница не найдена">
   <div class="nf-wrap">
@@ -8,7 +7,7 @@ import Layout from '../layouts/Layout.astro';
       <div class="nf-code">404</div>
       <h1 class="nf-title">Страница не найдена</h1>
       <p class="nf-sub">Такой страницы нет, или она была удалена.</p>
-      <a href="/" class="nf-btn">← Вернуться на главную</a>
+      <a href={u("/")} class="nf-btn">← Вернуться на главную</a>
     </div>
   </div>
 </Layout>
