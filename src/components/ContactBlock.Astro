@@ -1,66 +1,307 @@
 ---
+// src/components/ContactBlock.astro
+// Контакты: ООО «Автодом «На Королева» — реальные реквизиты
+const COMPANY = {
+  name: 'ООО «Автодом «На Королева»',
+  brand: 'Мир Моторов 24',
+  phoneDisplay: '+7 (391) 236-05-15',
+  phoneHref: 'tel:+73912360515',
+  emailDisplay: 'office@yamaha24.ru',
+  emailHref: 'mailto:office@yamaha24.ru',
+  address: '660064, Красноярск, ул. Вавилова, 1 к.Г, пом. 2',
+  schedule: [
+    { day: 'Пн – Пт', time: 'с 09:00 до 19:00' },
+    { day: 'Сб',      time: 'с 10:00 до 18:00' },
+    { day: 'Вс',      time: 'с 10:00 до 17:00' },
+  ],
+  socials: [
+    { label: 'ВКонтакте',   href: 'https://vk.com/yourpage',     text: 'Мир Моторов' },
+    { label: 'Telegram',    href: 'https://t.me/yourusername',  text: '@mirmotorov' },
+    { label: 'MAX Мессенджер', href: 'https://max.ru/yourid',   text: 'MAX: мirmotorov24' },
+  ],
+};
 ---
-<section class="contact-block">
-  <div class="contact-block__inner">
-    <div class="contact-info">
-      <h2>Свяжитесь с нами</h2>
-      <ul>
-        <li><a href="tel:+73912720555">8 (391) 2720-555</a></li>
-        <li><a href="mailto:main@mirmotorov24.ru">main@mirmotorov24.ru</a></li>
-        <li>660135 РФ, г. Красноярск, проспект Металлургов 2Р</li>
-        <li>60022 РФ, г. Красноярск, улица Королева 15</li>
-        <li>Часы работы:<br>Пн–Пт: 9:00 – 19:00<br>Сб: 9:00 – 17:00<br>Вс: выходной</li>
-      </ul>
+
+<section class="contact">
+  <div class="contact__container">
+    <div class="contact__head">
+      <span class="contact__eyebrow">Контакты</span>
+      <h2 class="contact__title">Приезжайте в салон <span class="contact__accent">{COMPANY.brand}</span> или позвоните нам</h2>
+      <p class="contact__sub">Ответим на любые вопросы по наличию, характеристикам, цене и оформлению мототехники. Подбор аналогов, тест-драйвы, консультации по доставке в регионы РФ.</p>
     </div>
-    <div class="map-container">
-      <!-- Здесь будет Яндекс.Карта. Пока заглушка -->
-      <div class="map-placeholder">
-        Карта Яндекса с отметками двух магазинов
+
+    <div class="contact__grid">
+      <!-- КОЛОНКА 1: КОНТАКТЫ -->
+      <div class="contact__info">
+        <div class="info__card">
+          <div class="info__row">
+            <span class="info__label">📞 Телефон (принимаем звонки ежедневно):</span>
+            <a class="info__val info__big info__red" href={COMPANY.phoneHref}>{COMPANY.phoneDisplay}</a>
+          </div>
+          <div class="info__row">
+            <span class="info__label">✉️ Email для заявок и вопросов:</span>
+            <a class="info__val" href={COMPANY.emailHref}>{COMPANY.emailDisplay}</a>
+          </div>
+          <div class="info__row">
+            <span class="info__label">📍 Юридический / фактический адрес:</span>
+            <span class="info__val">{COMPANY.address}</span>
+          </div>
+          <div class="info__row">
+            <span class="info__label">🏪 Режим работы салона:</span>
+            <ul class="info__schedule">
+              {COMPANY.schedule.map(s => (
+                <li><strong>{s.day}</strong> <span>{s.time}</span></li>
+              ))}
+            </ul>
+          </div>
+          <div class="info__row info__last">
+            <span class="info__label">💬 Написать нам в мессенджер:</span>
+            <div class="info__social">
+              {COMPANY.socials.map(s => (
+                <a class="social-btn" href={s.href} target="_blank" rel="noopener">{s.label}</a>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- КОЛОНКА 2: ФОРМА -->
+      <div class="contact__form-wrap">
+        <form class="form" onsubmit="event.preventDefault(); const n=this.querySelector('#cbn')?.value||'не указано'; const p=this.querySelector('#cbp')?.value||'не указан'; const t=this.querySelector('#cbt')?.value||'—'; alert('Заявка принята! Спасибо, '+n+'!\n\nВаш телефон: '+p+'\nВопрос: '+t+'\n\nМы свяжемся с вами в течение 15 минут в рабочее время.'); this.reset();">
+          <h3 class="form__title">Отправить заявку</h3>
+          <p class="form__sub">Оставьте контакты — менеджер перезвонит в течение 15 минут и проконсультирует по любому вопросу.</p>
+
+          <label class="form__label">
+            <span>Как к вам обращаться?*</span>
+            <input id="cbn" type="text" placeholder="Иванов Иван" required />
+          </label>
+          <label class="form__label">
+            <span>Телефон для связи*</span>
+            <input id="cbp" type="tel" placeholder="+7 (___) ___-__-__" required />
+          </label>
+          <label class="form__label">
+            <span>Ваш вопрос (что интересует?)</span>
+            <textarea id="cbt" rows="3" placeholder="Например: Pathcross 525L есть в наличии? Какая цена с доставкой?"></textarea>
+          </label>
+
+          <button class="form__submit" type="submit">
+            Отправить заявку
+          </button>
+          <p class="form__note">Нажимая кнопку, вы соглашаетесь с <a href="/policy" target="_blank">политикой конфиденциальности</a> и обработкой персональных данных.</p>
+        </form>
       </div>
     </div>
   </div>
 </section>
 
 <style>
-  .contact-block {
-    background: #fff;
-    padding: 3rem 1rem;
+  .contact {
+    background: #0f1423;
+    padding: 4rem 20px 5rem;
+    color: #ffffff;
   }
-  .contact-block__inner {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 2rem;
-    max-width: 1200px;
+  .contact__container {
+    max-width: 1280px;
     margin: 0 auto;
   }
-  .contact-info {
-    flex: 1 1 300px;
-    color: #000;
+  .contact__head {
+    text-align: center;
+    margin-bottom: 2.5rem;
   }
-  .contact-info h2 {
-    margin-bottom: 1rem;
+  .contact__eyebrow {
+    display: inline-block;
+    padding: 0.3rem 0.85rem;
+    background: rgba(237, 51, 51, 0.15);
+    color: #ED3333;
+    border-radius: 999px;
+    font-weight: 700;
+    font-size: 0.85rem;
+    margin-bottom: 0.8rem;
+    letter-spacing: 0.02em;
   }
-  .contact-info ul {
-    list-style: none;
-    padding: 0;
+  .contact__title {
+    margin: 0 0 0.8rem;
+    font-size: clamp(1.7rem, 3vw, 2.35rem);
+    font-weight: 800;
+    color: #ffffff;
+    line-height: 1.2;
+  }
+  .contact__accent { color: #ED3333; }
+  .contact__sub {
+    margin: 0 auto;
+    max-width: 880px;
+    color: #a3a8b5;
+    font-size: 1.02rem;
     line-height: 1.6;
   }
-  .contact-info a {
-    color: #e63946;
-    text-decoration: none;
+
+  .contact__grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
   }
-  .map-container {
-    flex: 1 1 400px;
-    min-height: 300px;
+  @media (max-width: 980px) {
+    .contact__grid { grid-template-columns: 1fr; }
+    .contact { padding: 3rem 16px 4rem; }
   }
-  .map-placeholder {
-    width: 100%;
+
+  .info__card {
+    background: #141b2e;
+    border: 1px solid #222a45;
+    border-radius: 14px;
+    padding: 1.8rem 1.7rem;
     height: 100%;
-    background: #eee;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #999;
-    border-radius: 8px;
+    box-sizing: border-box;
   }
+  .info__row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    margin-bottom: 1.25rem;
+  }
+  .info__last { margin-bottom: 0; }
+  .info__label {
+    color: #a3a8b5;
+    font-size: 0.85rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+  }
+  .info__val {
+    color: #ffffff;
+    font-size: 1.08rem;
+    text-decoration: none;
+    font-weight: 600;
+    line-height: 1.45;
+    transition: color 0.15s;
+  }
+  .info__val:hover { color: #ED3333; }
+  .info__big { font-size: 1.5rem; font-weight: 800; }
+  .info__red { color: #ED3333; }
+  .info__red:hover { color: #ff5b5b; }
+
+  .info__schedule {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+  .info__schedule li {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.5rem 0.75rem;
+    background: #0f1423;
+    border: 1px solid #222a45;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    color: #e5e7eb;
+  }
+  .info__schedule li strong { color: #ffffff; width: 90px; }
+  .info__schedule li span { color: #d1d5db; font-weight: 600; }
+
+  .info__social {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.55rem;
+    margin-top: 0.25rem;
+  }
+  .social-btn {
+    display: inline-block;
+    padding: 0.5rem 1rem;
+    background: #ffffff;
+    color: #0f1423;
+    border-radius: 999px;
+    text-decoration: none;
+    font-weight: 700;
+    font-size: 0.88rem;
+    transition: transform 0.15s, background 0.15s, color 0.15s;
+  }
+  .social-btn:hover { background: #ED3333; color: #ffffff; transform: translateY(-1px); }
+
+  /* Форма */
+  .contact__form-wrap {
+    display: flex;
+  }
+  .form {
+    background: #ffffff;
+    color: #111827;
+    border-radius: 14px;
+    padding: 1.8rem 1.7rem;
+    width: 100%;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    box-shadow: 0 24px 60px rgba(0,0,0,0.35);
+  }
+  .form__title {
+    margin: 0;
+    font-size: 1.45rem;
+    font-weight: 800;
+    color: #111827;
+  }
+  .form__sub {
+    margin: -0.3rem 0 0.2rem;
+    color: #6b7280;
+    font-size: 0.93rem;
+    line-height: 1.5;
+  }
+  .form__label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: #1f2937;
+  }
+  .form__label span { padding-left: 0.1rem; }
+  .form__label input,
+  .form__label textarea {
+    border: 1px solid #e5e7eb;
+    border-radius: 9px;
+    padding: 0.75rem 0.9rem;
+    font-size: 0.96rem;
+    font-family: inherit;
+    color: #111827;
+    background: #f8fafc;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    outline: none;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .form__label input::placeholder,
+  .form__label textarea::placeholder { color: #9ca3af; }
+  .form__label input:focus,
+  .form__label textarea:focus {
+    border-color: #ED3333;
+    background: #ffffff;
+    box-shadow: 0 0 0 3px rgba(237, 51, 51, 0.12);
+  }
+  .form__submit {
+    margin-top: 0.3rem;
+    background: #ED3333;
+    color: #ffffff;
+    border: none;
+    padding: 0.95rem 1.3rem;
+    border-radius: 10px;
+    font-weight: 800;
+    font-size: 1rem;
+    cursor: pointer;
+    letter-spacing: 0.01em;
+    transition: background 0.15s, transform 0.15s, box-shadow 0.15s;
+  }
+  .form__submit:hover {
+    background: #d62a2a;
+    transform: translateY(-1px);
+    box-shadow: 0 10px 24px rgba(237, 51, 51, 0.25);
+  }
+  .form__note {
+    margin: -0.2rem 0 0;
+    color: #6b7280;
+    font-size: 0.78rem;
+    line-height: 1.5;
+    text-align: center;
+  }
+  .form__note a { color: #ED3333; font-weight: 600; text-decoration: underline; }
 </style>
