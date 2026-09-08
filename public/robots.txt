@@ -1,0 +1,18 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /private
+
+# Яндекс
+User-agent: Yandex
+Allow: /
+Clean-param: utm_source&utm_medium&utm_campaign&utm_content&utm_term /
+Sitemap: https://mirmotorov24.ru/sitemap-index.xml
+
+# Google
+User-agent: Googlebot
+Allow: /
+Sitemap: https://mirmotorov24.ru/sitemap-index.xml
+
+Host: https://mirmotorov24.ru
+Sitemap: https://mirmotorov24.ru/sitemap-index.xml

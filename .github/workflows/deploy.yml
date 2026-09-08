@@ -1,0 +1,55 @@
+name: Deploy Astro to GitHub Pages
+
+on:
+  # Запускаем вручную или при push в main
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Права для Pages и Actions нужны для деплоя в gh-pages
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Одновременные деплои только 1 за раз
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Сборка Astro SSG
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout репозитория
+        uses: actions/checkout@v4
+
+      - name: Установка Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Установка зависимостей
+        run: npm ci
+
+      - name: Сборка сайта (Astro SSG)
+        run: npm run build
+
+      - name: Загрузка артефакта Pages
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./dist
+
+  deploy:
+    name: Публикация на GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Публикация
+        id: deployment
+        uses: actions/deploy-pages@v4

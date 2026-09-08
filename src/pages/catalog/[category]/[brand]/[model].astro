@@ -25,229 +25,427 @@ const categorySlug = categoryToSlug(product.category);
 const pageTitle = product.seo?.title || `${product.title} — купить в Красноярске`;
 const pageDescription = product.seo?.description || product.description || `Купить ${product.title} в Красноярске. Официальный дилер, гарантия, доставка.`;
 
-// Все фото товара, оптимизированные через astro:assets + миниатюры
-const photos: { rel: string; big: any; thumb: any }[] = [];
-(product.photo || []).forEach((src: string) => {
-  const s = String(src || '').trim();
-  if (!s) return;
-  const big = getProductImage(s, 'technique');
-  const thumb = getProductImage(s, 'technique'); // astro:assets берет 1 импорт — используем тот же
-  photos.push({ rel: s, big: big || s, thumb: thumb || s });
-});
+// Все фото товара. ⚠️ БЕЗ TypeScript-типов (баг Rolldown в Astro 7 Win)
+const photos = [];
+const productPhotos = Array.isArray(product.photo) ? product.photo.slice() : [];
+for (let k = 0; k < productPhotos.length; k++) {
+  const s = String(productPhotos[k] || '').trim();
+  if (!s) continue;
+  const bigImg = getProductImage(s, 'technique');
+  const thumbImg = getProductImage(s, 'technique');
+  photos.push({ rel: s, big: bigImg || s, thumb: thumbImg || s });
+}
 const firstPhoto = photos[0];
 
-// ====== СОПУТСТВУЮЩИЕ ТОВАРЫ ======
-// Алгоритм: находим товары, у которых в relatedTags есть modelSlug ТЕКУЩЕГО товара,
-// а также — если у ТЕКУЩЕГО товара есть relatedTags, то ищем их modelSlug.
 const allProducts = getAllProducts();
 const mySlug = product.modelSlug || '';
-const myRelated = (product.relatedTags || []) as string[];
-const related: any[] = [];
+const myRelated = product.relatedTags || [];
+const related = [];
 for (const p of allProducts) {
-  if (p.modelSlug === mySlug) continue; // сам себе не сопутствующий
+  if (p.modelSlug === mySlug) continue;
   const theirSlug = p.modelSlug || '';
-  const theirTags = (p.relatedTags || []) as string[];
-  const match1 = theirTags.includes(mySlug);  // у другого написано что подходит мне
-  const match2 = myRelated.includes(theirSlug); // у меня написано что подходит он
+  const theirTags = p.relatedTags || [];
+  const match1 = theirTags.includes(mySlug);
+  const match2 = myRelated.includes(theirSlug);
   if (match1 || match2) related.push(p);
   if (related.length >= 12) break;
 }
 
 const isTall = mainCatSlug === 'lodochnye-motory';
+const price = product.price || 0;
+const oldPrice = product.oldPrice || null;
+const priceVatOnly = price > 0 ? Math.round(price / 1.22 * 0.22) : 0;
+const priceNoVat = price > 0 ? Math.round(price / 1.22) : 0;
+const fullText = product.full_text || product.text || product.long_description || product.description || '';
 
-// ======== ⚙️ ХАРАКТЕРИСТИКИ: СТАНДАРТНЫЙ НАБОР ПО КАТЕГОРИЯМ ========
-// В CSV столбцы должны называться ТОЧНО как ключи справа (без пробелов, можно _)
-// Имя столбца в CSV (например char_Dvigatel или Двигатель) — подхватится
-const STD_CHARS: Record<string, [string, string][]> = {
-  kvadrocikly: [
-    ['engine_type', 'Тип двигателя'],
-    ['engine_cc', 'Объем двигателя, см³'],
-    ['max_power', 'Максимальная мощность, л.с.'],
-    ['transmission', 'Тип трансмиссии'],
-    ['drive', 'Система привода'],
-    ['front_susp', 'Передняя подвеска'],
-    ['rear_susp', 'Задняя подвеска'],
-    ['shocks', 'Амортизаторы'],
-    ['tires', 'Шины'],
-    ['wheels', 'Диски'],
-    ['steering', 'Рулевое управление'],
-    ['fuel_tank', 'Объем топливного бака, л'],
-    ['dimensions', 'Габаритные размеры, мм (Д×Ш×В)'],
-    ['equipment', 'Комплектация'],
-  ],
-  snegohody: [
-    ['engine_type', 'Тип двигателя'],
-    ['engine_cc', 'Объем двигателя, см³'],
-    ['max_power', 'Максимальная мощность, л.с./кВт (об/мин)'],
-    ['transmission', 'Тип трансмиссии'],
-    ['starter', 'Система запуска'],
-    ['front_susp', 'Передняя подвеска'],
-    ['track', 'Гусеница: длина / ширина / высота грунтозацепа / шаг, мм'],
-    ['fuel_system', 'Система питания'],
-    ['weight', 'Сухая / снаряженная масса, кг'],
-    ['brakes', 'Тормозная система'],
-    ['fuel_tank', 'Объем топливного бака, л'],
-    ['dimensions', 'Габаритные размеры, мм (Д×Ш×В)'],
-    ['equipment', 'Комплектация'],
-  ],
-  lodki: [
-    ['length_width', 'Длина / ширина, см'],
-    ['cockpit', 'Кокпит, см'],
-    ['balloon_d', 'Диаметр баллонов, см'],
-    ['weight', 'Вес, кг'],
-    ['seats', 'Посадочные места, чел.'],
-    ['max_hp', 'Макс. мощность ПЛМ, л.с.'],
-    ['capacity', 'Грузоподъемность, кг'],
-    ['balloons_qty', 'Количество баллонов, шт.'],
-    ['equipment', 'Комплектация'],
-  ],
-  'lodochnye-motory': [
-    ['engine_type', 'Тип двигателя'],
-    ['engine_cc', 'Объем двигателя, см³'],
-    ['max_power', 'Максимальная мощность, л.с.'],
-    ['gearbox', 'Передачи'],
-    ['starter', 'Система запуска'],
-    ['rpm_range', 'Диапазон рабочих оборотов, об/мин'],
-    ['fuel_system', 'Система подачи топлива'],
-    ['fuel_cons', 'Расход топлива на полном ходу, л/ч'],
-    ['fuel_rec', 'Рекомендуемый бензин'],
-    ['control_type', 'Система управления'],
-    ['trim', 'Трим'],
-    ['leg_len', 'Длина «ноги», мм'],
-    ['weight', 'Вес, кг'],
-  ],
+// ============== ⭐⭐⭐ СУПЕР-УНИВЕРСАЛЬНЫЙ getCharValue (2026-09-01) =============
+// Ищет 8 СПОСОБАМИ: 1) product.KEY 2) product.filters.KEY 3) product.characteristics[KEY]
+// 4) product.characteristics[char_KEY] 5) product.characteristics [ПО РУССКОМУ ИМЕНИ из маппинга]
+// 6) По ТОЧНОМУ названию столбца 7) По очищенному имени (без пробелов, знаков, регистра)
+// 8) По полям ВСЁ ЕЩЕ В product.characteristics по совпадению любого вида
+const RU_CHAR_MAP = {
+  engine_cc: 'Объем двигателя, см³', engine_type: 'Тип двигателя',
+  engine_cc2: 'Объем двигателя, см³',
+  max_power: 'Максимальная мощность, л.с.', power_hp: 'Максимальная мощность, л.с.',
+  max_power_rpm: 'Максимальная мощность при об/мин', max_torque: 'Крутящий момент, Н·м',
+  cylinders: 'Количество цилиндров',
+  tact: 'Тактность',
+  transmission: 'Коробка передач', gearbox: 'Коробка передач',
+  drive: 'Привод', diff_lock: 'Блокировка дифференциала',
+  front_susp: 'Передняя подвеска', rear_susp: 'Задняя подвеска', shocks: 'Амортизаторы',
+  tires: 'Шины', wheels: 'Диски колёс', wheels_disc: 'Диски колёс',
+  steering: 'Рулевое управление',
+  brakes: 'Тормозная система', front_brake_type: 'Передний тормоз', rear_brake_type: 'Задний тормоз',
+  fuel_system: 'Система питания', fuel_tank: 'Топливный бак, л',
+  cooling: 'Система охлаждения', ignition: 'Зажигание',
+  starter: 'Стартер', battery: 'Аккумулятор',
+  fuel_rec: 'Рекомендуемое топливо', fuel_cons: 'Расход топлива, л/ч',
+  fuel_cons_l_h: 'Расход топлива, л/ч', rpm_range: 'Рабочие обороты, об/мин',
+  track_width_mm: 'Ширина гусеницы, мм', caterpillar_len: 'Длина гусеницы, мм',
+  ski_type: 'Тип лыж', ski_width_mm: 'Ширина лыжи, мм',
+  control_type: 'Система управления', propulsion: 'Тип движителя',
+  leg_len: 'Длина вала (ноги), дюймы', leg_len_in: 'Длина вала, дюймы',
+  trim: 'Трим / материал баллона', cylinders_mat: 'Материал баллонов',
+  tilt_angle: 'Угол наклона / фиксации', gear_ratio: 'Передаточное число редуктора',
+  weight: 'Вес, кг', dimensions: 'Габариты Д×Ш×В, мм',
+  length_width: 'Длина × ширина', length_cm: 'Длина, см', beam_width_cm: 'Ширина, см',
+  wheelbase: 'Колёсная база, мм', ground_clearance: 'Дорожный просвет, мм',
+  length_cm: 'Длина лодки, см', beam_width_cm: 'Ширина лодки по бортам, см',
+  cockpit: 'Кокпит', cockpit_length_mm: 'Длина кокпита, мм', cockpit_width_mm: 'Ширина кокпита, мм',
+  balloon_d: 'Диаметр баллона, см', balloons_qty: 'Количество воздушных отсеков, шт.',
+  body_color: 'Цвет баллона', cockpit_color: 'Цвет кокпита / днища',
+  boat_type: 'Тип лодки', floor_type: 'Тип днища / сланей',
+  floor_material: 'Материал сланей',
+  seats: 'Посадочные места, чел.', capacity: 'Грузоподъёмность, кг',
+  load_capacity_kg: 'Грузоподъёмность, кг', capacity_pers: 'Пассажировместимость, чел.',
+  max_hp: 'Максимальная мощность мотора, л.с.', max_weight_motor_kg: 'Максимальный вес мотора, кг',
+  cabin_type: 'Тип кабины', doors: 'Количество дверей',
+  heater: 'Отопитель', hvac: 'Вентиляция / кондиционер HVAC',
+  lighting: 'Освещение', winch: 'Лебедка',
+  body_type: 'Тип кузова', cargo: 'Грузоподъёмность кузова, кг',
+  cargo_volume: 'Объём кузова, м³', dump_bed: 'Самосвальный кузов',
+  towing: 'Буксировка прицепа, кг',
+  max_speed: 'Максимальная скорость, км/ч',
+  equipment: 'Комплектация',
+  warranty: 'Гарантия', char_warranty: 'Гарантия',
+  country_of_origin: 'Страна производства',
 };
+function cleanStr(s) {
+  return (String(s || '')).toLowerCase().replace(/[^a-zа-я0-9]/gi, '');
+}
 
-// ═══════════════════════════════════════════════════════════
-// Извлекаем значение характеристики: ищем в char_*, или по ключу, или по названию
-function getCharValue(p: any, key: string): string | null {
-  if (!p) return null;
-  // 1) в product.characteristics по КЛЮЧУ
-  if (p.characteristics && p.characteristics[key]) {
-    const v = String(p.characteristics[key]);
-    if (v && v.trim()) return v.trim();
+// ============================================================
+// ✅ 3 ИСТОЧНИКА: product + product.filters + product.characteristics
+// ✅ ДУБЛИКАТЫ НЕ БУДУТ — мы используем ТОЧНЫЙ ЗАДАННЫЙ СПИСОК ПОЛЕЙ (не mergedKeys!)
+// ============================================================
+const mergedChars = { ...(product || {}), ...(product.filters || {}), ...(product.characteristics || {}) };
+const mergedKeys = Object.keys(mergedChars);
+const lenientMap = {};
+mergedKeys.forEach((mk) => { lenientMap[cleanStr(mk)] = mk; });
+function valueOf(key) {
+  if (!key) return null;
+  // 0. Дополнительно: столбцы csv с "неразрывным пробелом" в конце (trim , leg_len , fuel_tank )
+  const altKeys = [key];
+  if (key === 'trim') altKeys.push('trim ');
+  if (key === 'leg_len') altKeys.push('leg_len ');
+  if (key === 'fuel_tank') altKeys.push('fuel_tank ');
+  if (key === 'equipment') altKeys.push('equipment ');
+  // 1. Точное совпадение (включая альтернативные ключи с пробелом)
+  let v = undefined;
+  for (let ak = 0; ak < altKeys.length; ak++) {
+    if (mergedChars[altKeys[ak]] !== undefined) { v = mergedChars[altKeys[ak]]; break; }
   }
-  // 2) в product по КЛЮЧУ (например product.engine_cc)
-  if (p[key] !== undefined && p[key] !== null && String(p[key]).trim()) return String(p[key]).trim();
-  // 3) в product.characteristics по НАЗВАНИЮ
-  if (p.characteristics) {
-    for (const [k, v] of Object.entries(p.characteristics)) {
-      if (k.toLowerCase().replace(/[_\-]/g, '') === key.toLowerCase().replace(/[_\-]/g, '')) {
-        if (v && String(v).trim()) return String(v).trim();
-      }
+  if (v !== undefined && v !== null && String(v).trim() !== '') return String(v);
+  // 2. По русскому имени из RU_CHAR_MAP
+  const ruName = RU_CHAR_MAP[key];
+  if (ruName) {
+    v = mergedChars[ruName];
+    if (v !== undefined && v !== null && String(v).trim() !== '') return String(v);
+  }
+  // 3. По очищенному ключу
+  const kClean = cleanStr(key);
+  const hit = lenientMap[kClean];
+  if (hit) {
+    v = mergedChars[hit];
+    if (v !== undefined && v !== null && String(v).trim() !== '') return String(v);
+  }
+  // 4. По очищенному русскому имени
+  if (ruName) {
+    const ruClean = cleanStr(ruName);
+    const hitRu = lenientMap[ruClean];
+    if (hitRu) {
+      v = mergedChars[hitRu];
+      if (v !== undefined && v !== null && String(v).trim() !== '') return String(v);
     }
   }
-  // 4) дополнительно: поиск по char_ + ключу
-  if (p.characteristics) {
-    const charKey = `char_${key}`;
-    if (p.characteristics[charKey]) return String(p.characteristics[charKey]).trim();
+  // 5. Подстрока fallback
+  const fallbackKey = mergedKeys.find((mk) => {
+    const mkC = cleanStr(mk); if (!mkC) return false;
+    return mkC.includes(kClean) || (ruName && mkC.includes(cleanStr(ruName)));
+  });
+  if (fallbackKey) {
+    v = mergedChars[fallbackKey];
+    if (v !== undefined && v !== null && String(v).trim() !== '') return String(v);
   }
   return null;
 }
 
-const stdCharList = (STD_CHARS[mainCatSlug] || []).filter(([k, _n]) => getCharValue(product, k) !== null);
+// ======= ⭐⭐⭐ ЛИНЕЙНЫЙ СПИСОК ТХ (ВАШЕ ТЗ — БЕЗ ГРУПП! ТОЧНЫЙ ПОРЯДОК) =======
+// Каждая категория = массив [[key, русское_имя], ...]
+// Порядок СТРОГО как вы просили. ДУБЛИКАТОВ = 0. Прочие характеристики — УДАЛЕНЫ 100%!
+const FLAT_CHARS = {
+  kvadrocikly: [
+    // 1) Двигатель (БЕЗ max_power — только power_hp!)
+    ['engine_type','Тип двигателя'],
+    ['engine_cc','Объём двигателя, см³'],
+    ['tact','Тактность'],
+    ['power_hp','Мощность, л.с.'],
+    ['max_power_rpm','Максимальная мощность при об/мин'],
+    ['max_torque','Крутящий момент, Н·м'],
+    ['cylinders','Количество цилиндров'],
+    ['fuel_system','Система питания'],
+    ['cooling','Система охлаждения'],
+    ['ignition','Зажигание'],
+    ['starter','Стартер'],
+    ['battery','Аккумулятор'],
+    ['fuel_tank','Объём топливного бака, л'],
+    ['fuel_rec','Рекомендуемое топливо'],
+    ['fuel_cons','Расход топлива, л/ч'],
+    ['rpm_range','Диапазон рабочих оборотов, об/мин'],
+    // 2) Трансмиссия и привод
+    ['transmission','Коробка передач'],
+    ['drive','Тип привода'],
+    ['diff_lock','Блокировка дифференциала'],
+    // 3) Подвеска, ходовая, тормоза
+    ['front_susp','Передняя подвеска'],
+    ['rear_susp','Задняя подвеска'],
+    ['shocks','Амортизаторы'],
+    ['wheels','Диски колёс'],
+    ['wheels_disc','Диски колёс'],
+    ['tires','Шины'],
+    ['steering','Рулевое управление'],
+    ['brakes','Тормозная система'],
+    ['front_brake_type','Передний тормоз'],
+    ['rear_brake_type','Задний тормоз'],
+    // 4) Кузов, кабина, опции
+    ['body_type','Тип кузова'],
+    ['cabin_type','Тип кабины'],
+    ['doors','Количество дверей'],
+    ['heater','Отопитель'],
+    ['hvac','Вентиляция / кондиционер (HVAC)'],
+    ['seats','Количество мест, чел.'],
+    ['lighting','Освещение'],
+    ['winch','Лебедка'],
+    ['cargo','Грузоподъёмность, кг'],
+    ['cargo_volume','Объём кузова, м³'],
+    ['dump_bed','Самосвальный кузов'],
+    ['towing','Буксировка прицепа, кг'],
+    // 5) Габариты и вес
+    ['weight','Снаряженный вес, кг'],
+    ['dimensions','Габариты Д×Ш×В, мм'],
+    ['length_width','Длина × ширина, мм'],
+    ['wheelbase','Колёсная база, мм'],
+    ['ground_clearance','Дорожный просвет, мм'],
+    ['max_speed','Максимальная скорость, км/ч'],
+    // 6) Комплектация + ГАРАНТИЯ (в самом конце!)
+    ['equipment','Комплектация'],
+    ['char_warranty','Гарантия'],
+    ['warranty','Гарантия'],
+    ['country_of_origin','Страна производства'],
+  ],
+  snegohody: [
+    ['engine_type','Тип двигателя'],
+    ['engine_cc','Объём двигателя, см³'],
+    ['tact','Тактность'],
+    ['power_hp','Мощность, л.с.'],
+    ['cooling','Система охлаждения'],
+    ['fuel_system','Система питания'],
+    ['ignition','Зажигание'],
+    ['starter','Стартер'],
+    ['battery','Аккумулятор'],
+    ['fuel_tank','Топливный бак, л'],
+    ['fuel_rec','Рекомендуемое топливо'],
+    ['rpm_range','Рабочие обороты, об/мин'],
+    ['transmission','Коробка передач'],
+    ['drive','Привод'],
+    ['front_susp','Передняя подвеска лыж'],
+    ['rear_susp','Задняя подвеска гусеницы'],
+    ['shocks','Амортизаторы'],
+    ['brakes','Тормозная система'],
+    ['steering','Управление'],
+    ['ski_type','Тип лыж'],
+    ['ski_width_mm','Ширина лыжи, мм'],
+    ['cabin_type','Тип кабины'],
+    ['seats','Мест, чел.'],
+    ['heating','Обогрев руля'],
+    ['lighting','Освещение'],
+    ['cargo','Багаж, кг'],
+    ['towing','Буксировка, кг'],
+    ['weight','Вес, кг'],
+    ['dimensions','Габариты Д×Ш×В, мм'],
+    // ✅ Гусеница — ПЕРЕНЕСЕНА В КОНЕЦ (габариты)
+    ['caterpillar_len','Длина гусеницы, мм'],
+    ['track_width_mm','Ширина гусеницы, мм'],
+    ['max_speed','Максимальная скорость, км/ч'],
+    ['equipment','Комплектация'],
+    ['char_warranty','Гарантия'],
+    ['warranty','Гарантия'],
+    ['country_of_origin','Страна производства'],
+  ],
+  lodki: [
+    // 1) Размеры
+    ['length_cm','Длина, см'],
+    ['beam_width_cm','Ширина по бортам, см'],
+    ['length_width','Длина × ширина, см / мм'],
+    ['dimensions','Габариты Д×Ш×В, мм'],
+    // 2) Кокпит
+    ['cockpit','Кокпит, см'],
+    ['cockpit_length_mm','Длина кокпита, мм'],
+    ['cockpit_width_mm','Ширина кокпита, мм'],
+    // 3) Баллоны
+    ['balloon_d','Диаметр баллона, см'],
+    ['balloons_qty','Количество воздушных отсеков, шт.'],
+    ['trim','Материал и плотность ПВХ, г/м²'],
+    ['cylinders_mat','Материал баллонов'],
+    ['body_color','Цвет баллона'],
+    ['cockpit_color','Цвет кокпита'],
+    // 4) Пассажиры, груз, вес
+    ['seats','Посадочные места, чел.'],
+    ['capacity_pers','Пассажировместимость, чел.'],
+    ['capacity','Грузоподъёмность, кг'],
+    ['load_capacity_kg','Грузоподъёмность, кг'],
+    ['weight','Вес лодки, кг'],
+    // 5) Мотор и днище
+    ['boat_type','Тип лодки'],
+    ['floor_type','Тип днища (сланей)'],
+    ['floor_material','Материал сланей / днища'],
+    ['max_hp','Максимальная мощность мотора, л.с.'],
+    ['max_weight_motor_kg','Максимальный вес мотора, кг'],
+    ['leg_len','Рекомендуемая длина вала мотора, дюймы'],
+    ['leg_len_in','Длина вала, дюймы'],
+    // 6) Комплектация + гарантия (в КОНЦЕ!)
+    ['equipment','Комплектация'],
+    ['char_warranty','Гарантия'],
+    ['warranty','Гарантия'],
+    ['country_of_origin','Страна производства'],
+  ],
+  'lodochnye-motory': [
+    // ✅ ВАШЕ ТЗ: в раздел Двигатель добавить Система управления + Тип движителя + Вес!
+    ['engine_type','Тип двигателя'],
+    ['engine_cc','Объём двигателя, см³'],
+    ['tact','Тактность'],
+    ['cylinders','Количество цилиндров'],
+    ['power_hp','Мощность, л.с.'],
+    ['fuel_system','Система питания'],
+    ['cooling','Система охлаждения'],
+    ['ignition','Зажигание'],
+    ['starter','Стартер'],
+    ['battery','Аккумулятор'],
+    ['fuel_tank','Топливный бак, л'],
+    ['fuel_cons','Расход топлива, л/ч'],
+    ['fuel_cons_l_h','Расход топлива, л/ч'],
+    ['rpm_range','Рабочие обороты, об/мин'],
+    ['fuel_rec','Рекомендуемое топливо'],
+    // ↓↓↓ ДОБАВЛЕНО: control_type, propulsion, weight (как просили!) ↓↓↓
+    ['control_type','Система управления'],
+    ['propulsion','Тип движителя'],
+    ['weight','Вес, кг'],
+    // Остальное как у всех
+    ['transmission','Коробка / редуктор'],
+    ['gear_ratio','Передаточное число редуктора'],
+    ['leg_len','Длина вала (ноги), дюймы'],
+    ['leg_len_in','Длина вала, дюймы'],
+    ['tilt_angle','Угол наклона (фиксаций)'],
+    ['trim','Трим (подъём / опускание)'],
+    ['dimensions','Габариты Д×Ш×В, мм'],
+    ['max_speed','Максимальная скорость с лодкой, км/ч'],
+    ['equipment','Комплектация'],
+    ['char_warranty','Гарантия'],
+    ['warranty','Гарантия'],
+    ['country_of_origin','Страна производства'],
+  ],
+};
+function buildFlatChars(mainCat) {
+  const rows = FLAT_CHARS[mainCat] || [];
+  const seenKeys = {};
+  const seenLabelVal = {};
+  const out = [];
+  for (let i = 0; i < rows.length; i++) {
+    const k = rows[i][0]; const label = rows[i][1];
+    const v = valueOf(k); if (!v) continue;
+    if (seenKeys[k]) continue; // уже добавили
+    const keyForDup = label + '@' + cleanStr(v);
+    if (seenLabelVal[keyForDup]) continue; // дубликат по label+значению
+    seenKeys[k] = true;
+    seenLabelVal[keyForDup] = true;
+    out.push([k, label, v]);
+  }
+  return out;
+}
+const finalCharList = buildFlatChars(mainCatSlug);
+// ❗ ПРОЧИЕ ХАРАКТЕРИСТИКИ — УДАЛЕНЫ ПОЛНОСТЬЮ (100%)!
+const hasChars = finalCharList.length > 0;
 
-// ===== ЦЕНА (как в CSV). Ниже подпись «с учетом НДС 22%» =====
-const price = product.price ?? 0;
-const vatRate = 0.22;
-const priceVatOnly = Math.round(price * vatRate / (1 + vatRate));   // сумма НДС внутри цены
-const priceNoVat = Math.round(price - priceVatOnly);                // цена без НДС
-const oldPrice = product.oldPrice && product.oldPrice > price ? product.oldPrice : null;
+// Диагностика в F12 Console
+if (typeof console !== 'undefined') {
+  console.log('[ТХ] product.title =', product.title);
+  console.log('[ТХ] mainCatSlug =', mainCatSlug);
+  console.log('[ТХ] finalCharList (ВСЕГО СТРОК:', finalCharList.length, '):', finalCharList.map(r => r[1] + ' = ' + r[2]));
+  console.log('[ТХ] valueOf(char_warranty) =', valueOf('char_warranty'));
+  console.log('[ТХ] valueOf(engine_cc) =', valueOf('engine_cc'));
+  console.log('[ТХ] valueOf(control_type) =', valueOf('control_type'), ' | propulsion=', valueOf('propulsion'));
+}
 
-// ===== Полное описание: либо text, либо отдельный CSV столбец full_text, либо description =====
-const fullText = product.full_text || product.text || product.long_description || product.description;
+// ====== Хлебные крошки ======
+const breadcrumbs = [
+  { href: '/', name: 'Главная' },
+  { href: '/catalog', name: 'Каталог' },
+  { href: `/catalog/${mainCatSlug}`, name: mainCat },
+  { href: `/catalog/${mainCatSlug}/${product.brandSlug}`, name: product.brand || product.brandSlug },
+  { href: null, name: product.title },
+];
 ---
 
 <Layout title={pageTitle} description={pageDescription}>
-  <div class="container">
-    <!-- Хлебные крошки -->
+  <div class="container container--py">
+
     <nav class="breadcrumb">
-      <a href="/">Главная</a> /
-      <a href="/catalog">Каталог</a> /
-      <a href={`/catalog/${mainCatSlug}`}>{mainCat}</a> /
-      <a href={`/catalog/${categorySlug}/${product.brandSlug}`}>{product.brand || product.brandSlug}</a> /
-      <span>{product.title}</span>
+      {breadcrumbs.map((b, i) => (
+        <>
+          {i > 0 && <span> / </span>}
+          {b.href ? <a href={b.href}>{b.name}</a> : <span>{b.name}</span>}
+        </>
+      ))}
     </nav>
 
-    {/* H1 Заголовок — СРАЗУ после хлебных крошек (по ТЗ) */}
     <h1 class="page-h1">{product.title}</h1>
 
-    {/* ======================= 1) ВЕРХНЯЯ ЧАСТЬ — ГАЛЕРЕЯ (ЛЕВО) + ИНФО (СПРАВО) ======================= */}
+    {/* ============== 1) ГАЛЕРЕЯ (ЛЕВО) + ИНФО (ПРАВО) ============== */}
     <div class="product-top">
-
-      {/* ========= ЛЕВО: ОСНОВНАЯ КАРТИНКА + МИНИАТЮРЫ ========= */}
-      <div class="gallery-wrap">
-
-        {/* БОЛЬШАЯ КАРТИНКА (object-fit: contain — НИКОГДА не зажимает!) */}
-        <div class={`main-image ${isTall ? 'main-image--tall' : ''}`} id="main-image-box">
-          {firstPhoto ? (
-            firstPhoto.big && typeof firstPhoto.big !== 'string' ? (
-              <Image
-                id="product-main-image"
-                src={firstPhoto.big}
-                alt={product.title}
-                width={900}
-                height={isTall ? 1200 : 680}
-                fit="contain"
-                format="webp"
-                quality={90}
-                data-main="1"
-              />
-            ) : (
-              <img id="product-main-image" src={String(firstPhoto.big)} alt={product.title} />
-            )
+      {/* ===== ЛЕВО: галерея ===== */}
+      <div class={`gallery ${isTall ? 'gallery--tall' : ''}`}>
+        <div class="main-image" id="mainImageWrap">
+          {firstPhoto && firstPhoto.big && typeof firstPhoto.big !== 'string' ? (
+            <Image
+              id="mainImage"
+              src={firstPhoto.big}
+              alt={product.title}
+              width={isTall ? 450 : 600}
+              height={isTall ? 600 : 450}
+              fit="contain"
+              format="webp"
+              quality={88}
+            />
+          ) : firstPhoto ? (
+            <img id="mainImage" src={String(firstPhoto.big)} alt={product.title} />
           ) : (
-            <img id="product-main-image" src="/placeholder.jpg" alt={product.title} />
+            <div class="no-photo">Фото появится скоро</div>
           )}
         </div>
-
-        {/* МИНИАТЮРЫ (горизонтальный скролл, клик — меняют большую) */}
         {photos.length > 1 && (
-          <div class="thumbs-scroll">
-            <div class="thumbs-inner">
-              {photos.map((ph, i) => (
-                <button
-                  type="button"
-                  class={`thumb ${i === 0 ? 'active' : ''}`}
-                  data-index={i}
-                  aria-label={`Фото ${i + 1}`}
-                >
-                  {typeof ph.thumb !== 'string' ? (
-                    <Image
-                      src={ph.thumb}
-                      alt={`${product.title} фото ${i + 1}`}
-                      width={160}
-                      height={isTall ? 220 : 120}
-                      fit="contain"
-                      format="webp"
-                      quality={75}
-                    />
-                  ) : (
-                    <img src={ph.thumb} alt={`${product.title} фото ${i + 1}`} loading="lazy" />
-                  )}
+          <div class="thumbs-scroll" id="thumbsWrap">
+            {photos.map((ph, i) => {
+              const isActive = i === 0;
+              return (
+                <button type="button" class={`thumb-btn ${isActive ? 'active' : ''}`} data-idx={i}>
+                  {ph.thumb && typeof ph.thumb !== 'string' ? (
+                    <Image src={ph.thumb} width={120} height={90} fit="contain" alt="" format="webp" quality={70} />
+                  ) : <img src={String(ph.thumb || ph.rel)} alt="" width={120} height={90} />}
                 </button>
-              ))}
-            </div>
+              );
+            })}
           </div>
         )}
       </div>
 
-      {/* ========= ПРАВО: ИНФО О ТОВАРЕ (ТОЛЬКО ЦЕНА + НАЛИЧИЕ + КНОПКА) ========= */}
+      {/* ===== ПРАВО: цена / кнопка ===== */}
       <aside class="info-card">
-        {product.brand && <div class="brand-pill">🏷️ {product.brand}</div>}
+        {product.brand && <div class="brand-pill">{product.brand}</div>}
 
         <div class="top-meta">
-          {product.quantity !== undefined && product.quantity !== null && (
-            <div class={`stock ${product.quantity > 0 ? 'ok' : 'na'}`}>
-              {product.quantity > 0
-                ? `✅ В наличии — ${product.quantity} шт.`
-                : '⏱️ Под заказ, 2–5 раб. дней'}
-            </div>
-          )}
           {product.article && <div class="article-pill">Арт. <b>{product.article}</b></div>}
         </div>
 
-        {/* ============ ЦЕНА (как в CSV) ============ */}
         <div class="price-block">
           <div class="price-main">{price.toLocaleString('ru-RU')} ₽</div>
           {oldPrice && (
@@ -256,40 +454,27 @@ const fullText = product.full_text || product.text || product.long_description |
               <div class="discount-badge">−{Math.round((1 - price / oldPrice) * 100)}%</div>
             </>
           )}
-          <div class="price-vat-note">
-            ✅ Цена указана с учетом НДС 22%
-            {price > 0 && (
-              <span class="price-no-vat">
-                <br />
-                <span>В том числе НДС: {priceVatOnly.toLocaleString('ru-RU')} ₽</span>
-                <span>Стоимость без НДС: {priceNoVat.toLocaleString('ru-RU')} ₽</span>
-              </span>
-            )}
-          </div>
+          <div class="price-vat-note">в том числе НДС 22%</div>
         </div>
 
-        <button class="btn-primary" id="contact-btn">📞 Забронировать</button>
+        <button class="btn-primary" id="contact-btn">Забронировать</button>
         <p class="btn-sub">Менеджер перезвонит в течение 15 минут в рабочее время</p>
       </aside>
     </div>
 
-    {/* ======================= 2) НИЖНЯЯ ЧАСТЬ ======================= */}
+    {/* ============== 2) НИЖНЯЯ ЧАСТЬ (ВСЯ ШИРИНА) ============== */}
     <div class="product-bottom">
 
-      {/* ======== 📖 О товаре — ПО ЦЕНТРУ (полное описание из CSV: `text` или `full_text`) ======== */}
       {fullText && fullText.trim() && (
-        <section class="bottom-section">
-          <h2 class="h2-section">📖 О товаре</h2>
+        <section class="bottom-section about-wide">
+          <h2 class="h2-section">О товаре</h2>
           <div class="about-product">
             {fullText.includes('<') || fullText.includes('&#') ? (
               <Fragment set:html={fullText} />
             ) : (
-              fullText.split(/\n+/).map((para: string, i: number) => {
+              fullText.split(/\n+/).map((para, i) => {
                 const t = para.trim();
                 if (!t) return null;
-                if (/^(📌|✅|⚡|🏷️|🚚|📞|⚠️|❗|👉|ℹ️)/.test(t)) {
-                  return <p key={i} class="about-highlight">{t}</p>;
-                }
                 return <p key={i}>{t}</p>;
               })
             )}
@@ -297,457 +482,436 @@ const fullText = product.full_text || product.text || product.long_description |
         </section>
       )}
 
-      {/* ======== ⚙️ ТЕХНИЧЕСКИЕ ХАРАКТЕРИСТИКИ (стандарт + char_*) ======== */}
-      {(stdCharList.length > 0 || (product.characteristics && Object.keys(product.characteristics).filter(k => !k.startsWith('char_')).length > 0) || (product.characteristics && Object.keys(product.characteristics).filter(k => k.startsWith('char_')).length > 0)) && (
+      {hasChars && (
         <section class="bottom-section">
-          <h2 class="h2-section">⚙️ Технические характеристики</h2>
-          <div class="chars-wrap">
+          <h2 class="h2-section">Технические характеристики</h2>
+          <div class="chars-wrap chars-narrow">
             <table class="chars-table">
               <tbody>
-                {stdCharList.map(([key, name]) => {
-                  const v = getCharValue(product, key);
-                  if (!v) return null;
-                  return (
-                    <tr key={key}>
-                      <td class="ch-name">{name}</td>
-                      <td class="ch-value"><strong>{v}</strong></td>
-                    </tr>
-                  );
-                })}
-                {product.characteristics && Object.entries(product.characteristics)
-                  .filter(([k, _v]) => !k.startsWith('char_') && !STD_CHARS[mainCatSlug]?.some(([cK]) => getCharValue(product, cK) && cK === k.toLowerCase().replace(/[\s\-]/g, '_')))
-                  .map(([k, v]) => {
-                    if (!v || !String(v).trim()) return null;
-                    const niceName = k.replace(/^char_/, '').replace(/[_]+/g, ' ');
-                    return (
-                      <tr key={k}>
-                        <td class="ch-name">{niceName}</td>
-                        <td class="ch-value"><strong>{String(v)}</strong></td>
-                      </tr>
-                    );
-                  })}
-                {product.characteristics && Object.entries(product.characteristics)
-                  .filter(([k, _v]) => k.startsWith('char_'))
-                  .map(([k, v]) => {
-                    if (!v || !String(v).trim()) return null;
-                    const niceName = k.replace(/^char_/, '').replace(/[_]+/g, ' ');
-                    const already = stdCharList.find(([cK]) => getCharValue(product, cK) === String(v).trim());
-                    if (already) return null;
-                    return (
-                      <tr key={k}>
-                        <td class="ch-name">{niceName}</td>
-                        <td class="ch-value"><strong>{String(v)}</strong></td>
-                      </tr>
-                    );
-                  })}
+                {finalCharList.map(([key, name, v]) => (
+                  <tr key={key} class="ch-row">
+                    <td class="ch-name">{name}</td>
+                    <td class="ch-value"><strong>{v}</strong></td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
         </section>
       )}
 
+      {/* =====⭐⭐⭐ ОФЕРТА (СТ. 435 / Ч.2 СТ. 437 ГК РФ) — ПОСЛЕ ТТХ ===== */}
+      <section class="bottom-section offer-notice">
+        <div class="offer-box">
+          <p class="offer-star">*</p>
+          <p class="offer-text">
+            Информация, опубликованная на Сайте, носит исключительно информационный характер и ни при каких обстоятельствах не является публичной офертой, определяемой положениями ст.&nbsp;435 и ч.&nbsp;2 ст.&nbsp;437 Гражданского кодекса Российской Федерации. Сведения о товаре, его характеристиках, комплектации и цене представлены на Сайте для ознакомления.
+          </p>
+        </div>
+      </section>
+
       {related.length > 0 && (
         <section class="bottom-section">
-          <h2 class="h2-section">🎯 Подходит к этому товару</h2>
-          <p class="sec-sub">Рекомендуемые аксессуары, запчасти и оборудование</p>
-
-          <div class="related-scroll">
-            <div class="related-inner">
-              {related.map((relP) => {
-                const imgSrc = relP.photo?.[0];
-                const optImg = getProductImage(imgSrc, 'technique');
-                const relMainCat = getMainCategory(relP.category) || '';
-                const url = `/catalog/${categoryToSlug(relP.category)}/${relP.brandSlug}/${relP.modelSlug}`;
-                return (
-                  <a href={url} class="related-card">
-                    <div class="rel-img">
-                      {optImg ? (
-                        <Image src={optImg} alt={relP.title} width={300} height={225} fit="contain" format="webp" quality={78} loading="lazy" />
-                      ) : (
-                        <img src={imgSrc || '/placeholder.jpg'} alt={relP.title} loading="lazy" />
-                      )}
-                    </div>
-                    <div class="rel-body">
-                      <div class="rel-cat">{relMainCat}</div>
-                      <div class="rel-title">{relP.title}</div>
-                      <div class="rel-price">
-                        {relP.price ? `${relP.price.toLocaleString('ru-RU')} ₽` : 'Цену уточняйте'}
-                      </div>
-                    </div>
-                  </a>
-                );
-              })}
-            </div>
+          <h2 class="h2-section">Сопутствующие товары</h2>
+          <div class={`grid-4col ${mainCatSlug === 'lodochnye-motory' ? 'grid--tall' : ''}`}>
+            {related.map(r => {
+              const rImg = r.photo?.[0];
+              const rImgOp = getProductImage(rImg, 'aksessuary');
+              return (
+                <a href={`/catalog/${mainCatSlug}/${r.brandSlug || 'aksessuary'}/${r.modelSlug}`} class="related-card">
+                  <div class={`rcard-img ${mainCatSlug === 'lodochnye-motory' ? 'rcard-img--tall' : ''}`}>
+                    {rImgOp ? (
+                      <Image src={rImgOp} width={260} height={195} fit="contain" loading="lazy" alt={r.title} format="webp" quality={75} />
+                    ) : <img src={rImg || '/placeholder.jpg'} alt={r.title} width={260} height={195} loading="lazy" />}
+                  </div>
+                  <div class="rcard-body">
+                    <h4>{r.title}</h4>
+                    {r.price ? <div class="rcard-price">{r.price.toLocaleString('ru-RU')} ₽</div> : <div class="rcard-price no-price">Цена уточняется</div>}
+                  </div>
+                </a>
+              );
+            })}
           </div>
         </section>
       )}
-    </div>
-  </div>
 
-  {/* ====== Модалка ====== */}
-  <div id="contact-modal" class="modal" style="display: none;">
-    <div class="modal-content">
-      <span class="close" id="modal-close">&times;</span>
-      <h2>Заявка на <span id="modal-product">{product.title}</span></h2>
-      <form id="contact-form">
-        <input type="text" name="name" placeholder="Ваше имя *" required />
-        <input type="tel" name="phone" placeholder="Телефон *" required />
-        <textarea name="comment" placeholder="Комментарий: срок, доставка, цвет..."></textarea>
-        <button type="submit" class="btn-primary">Отправить заявку</button>
-        <p class="form-law">Нажимая кнопку вы соглашаетесь с политикой обработки персональных данных</p>
-      </form>
     </div>
   </div>
 </Layout>
 
+<!-- ===== Modal ===== -->
+<div id="contactModal" class="modal" aria-hidden="true">
+  <div class="modal__overlay" tabindex="-1" data-close></div>
+  <div class="modal__dialog" role="dialog" aria-modal="true" aria-labelledby="contactTitle">
+    <button type="button" class="modal__close" aria-label="Закрыть" data-close>×</button>
+    <h3 id="contactTitle">Заявка на бронирование</h3>
+    <p class="modal__subtitle">{product.title}<br />Оставьте контакты — менеджер свяжется в течение 15 минут</p>
+    <form id="contactForm" class="modal__form">
+      <input type="hidden" name="product" value={product.title} />
+      <label class="fld">
+        <span>Ваше имя</span>
+        <input type="text" name="name" required placeholder="Как к вам обращаться" />
+      </label>
+      <label class="fld">
+        <span>Телефон *</span>
+        <input type="tel" name="phone" required placeholder="+7 (___) ___-__-__" pattern=".*[0-9].*" />
+      </label>
+      <label class="fld">
+        <span>Комментарий</span>
+        <textarea name="comment" rows="3" placeholder="Удобное время звонка, вопросы по комплектации..."></textarea>
+      </label>
+      <button type="submit" class="btn-primary btn-primary--full">Отправить заявку</button>
+      <p class="form-agree">Нажимая кнопку, вы соглашаетесь с политикой обработки персональных данных</p>
+    </form>
+  </div>
+</div>
+
 <style>
-/* ===== Общий контейнер ===== */
-.container { max-width: 1400px; margin: 0 auto; padding: 1.5rem 20px 3rem; }
+.container { max-width: 1400px; margin: 0 auto; padding: 0 20px; }
+.container--py { padding-top: 1.5rem; padding-bottom: 3rem; }
+.breadcrumb { color: #6b7280; font-size: 0.9rem; padding: 0.8rem 0 0.6rem; }
+.breadcrumb a { color: #1f2937; text-decoration: none; }
+.breadcrumb a:hover { text-decoration: underline; }
+.breadcrumb span { color: #374151; }
 
-.breadcrumb { color: #6b7280; font-size: 0.88rem; margin-bottom: 1.3rem; }
-.breadcrumb a { color: #374151; text-decoration: none; }
-.breadcrumb a:hover { color: #f59e0b; }
+.page-h1 {
+  font-size: clamp(1.4rem, 2.2vw, 1.9rem);
+  font-weight: 900;
+  margin: 0 0 1.2rem;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+  color: #111827;
+}
 
-/* =========================== 1) ВЕРХНЯЯ ЧАСТЬ =========================== */
+/* ==== TOP: gallery + info-card ==== */
 .product-top {
   display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
-  gap: 2rem;
-  align-items: start;
+  grid-template-columns: minmax(0, 1.4fr) minmax(320px, 1fr);
+  gap: 2.5rem;
   margin-bottom: 3rem;
+  align-items: start;
 }
-@media (max-width: 960px) {
-  .product-top { grid-template-columns: 1fr; gap: 1.5rem; }
-}
+@media (max-width: 980px) { .product-top { grid-template-columns: 1fr; gap: 1.5rem; } }
 
-/* ========= ЛЕВО: ГАЛЕРЕЯ ========= */
-.gallery-wrap { display: flex; flex-direction: column; gap: 0.85rem; position: sticky; top: 1rem; }
-@media (max-width: 960px) { .gallery-wrap { position: static; } }
-
-/* ⭐ ГЛАВНОЕ: object-fit: contain — КАРТИНКА НИКОГДА не «зажимается», вписана целиком! */
+/* ГАЛЕРЕЯ */
+.gallery { display: flex; flex-direction: column; gap: 1rem; }
 .main-image {
-  width: 100%;
   aspect-ratio: 4 / 3;
-  background: linear-gradient(135deg, #f8fafc 0%, #eef2f7 100%);
+  background: #fafafa;
+  border: 1px solid #f1f5f9;
   border-radius: 14px;
-  display: flex; align-items: center; justify-content: center;
-  padding: 1.25rem;
-  overflow: hidden;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
-}
-.main-image--tall { aspect-ratio: 3 / 4; padding: 1.5rem 1rem; }
-.main-image :global(img),
-.main-image img {
-  max-width: 100%;
-  max-height: 100%;
-  width: auto !important;
-  height: auto !important;
-  object-fit: contain !important;
-  display: block;
-  border-radius: 8px;
-}
-
-/* Миниатюры: скролл */
-.thumbs-scroll {
-  width: 100%;
-  overflow-x: auto;
-  scroll-behavior: smooth;
-  padding-bottom: 4px;
-}
-.thumbs-inner {
   display: flex;
-  gap: 0.6rem;
-}
-.thumb {
-  flex: 0 0 auto;
-  width: 100px;
-  height: 75px;
-  background: #fff;
-  border: 2px solid #e5e7eb;
-  border-radius: 8px;
-  padding: 4px;
-  cursor: pointer;
-  transition: all 0.15s;
-  display: flex; align-items: center; justify-content: center;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  min-height: 300px;
+  contain: layout style;
   overflow: hidden;
 }
-.main-image--tall ~ .thumbs-scroll .thumb,
-.gallery-wrap:has(.main-image--tall) .thumb { width: 72px; height: 96px; }
-.thumb img, .thumb :global(img) {
+.gallery--tall .main-image { aspect-ratio: 3 / 4; }
+.main-image :global(img), .main-image img {
   max-width: 100%; max-height: 100%;
   width: auto !important; height: auto !important;
-  object-fit: contain !important; border-radius: 4px;
+  object-fit: contain !important;
 }
-.thumb:hover { border-color: #fcd34d; transform: translateY(-2px); }
-.thumb.active { border-color: #f59e0b; background: #fffbeb; box-shadow: 0 0 0 3px #fef3c7; }
+.no-photo { color: #9ca3af; padding: 2rem; }
 
-/* ========= ПРАВО: ИНФО ========= */
-.info-card {
+.thumbs-scroll {
+  display: flex;
+  gap: 0.6rem;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.3rem 0.3rem 0.7rem;
+  scrollbar-width: thin;
+}
+.thumb-btn {
+  flex: 0 0 auto;
+  border: 2px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 0;
   background: #fff;
+  cursor: pointer;
+  width: 100px;
+  height: 78px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.gallery--tall .thumb-btn { width: 80px; height: 106px; }
+.thumb-btn:hover { border-color: #f59e0b; }
+.thumb-btn.active {
+  border-color: #1f2937;
+  box-shadow: 0 0 0 2px rgba(31,41,55, 0.08);
+}
+.thumb-btn :global(img), .thumb-btn img {
+  max-width: 100%; max-height: 100%;
+  width: auto !important; height: auto !important;
+  object-fit: contain;
+  padding: 4px;
+}
+
+/* ==== INFO CARD (правый блок) ==== */
+.info-card {
+  background: #ffffff;
   border: 1px solid #e5e7eb;
   border-radius: 14px;
-  padding: 1.75rem;
-  box-shadow: 0 2px 14px rgba(0,0,0,0.06);
+  padding: 1.5rem;
+  position: sticky;
+  top: 1rem;
   display: flex;
   flex-direction: column;
   gap: 1rem;
 }
+@media (max-width: 980px) { .info-card { position: static; } }
+
 .brand-pill {
+  display: inline-flex;
   align-self: flex-start;
-  background: #ede9fe;
-  color: #5b21b6;
-  padding: 5px 12px;
-  border-radius: 20px;
-  font-weight: 600;
-  font-size: 0.82rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: #f3f4f6;
+  color: #111827;
+  letter-spacing: 0.02em;
 }
-.product-title { margin: 0; font-size: clamp(1.35rem, 2vw, 1.8rem); font-weight: 900; line-height: 1.2; letter-spacing: -0.02em; color: #111827; }
-.top-meta { display: flex; flex-wrap: wrap; gap: 0.5rem; }
-.stock {
-  padding: 6px 12px;
-  border-radius: 8px;
-  font-weight: 600;
-  font-size: 0.88rem;
-  width: fit-content;
-}
-.stock.ok { background: #dcfce7; color: #166534; }
+.top-meta { display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: space-between; }
+.stock { font-size: 0.82rem; padding: 4px 10px; border-radius: 999px; font-weight: 600; }
+.stock.ok { background: #d1fae5; color: #065f46; }
 .stock.na { background: #fef3c7; color: #92400e; }
-.article-pill {
-  padding: 6px 12px; background: #f3f4f6; color: #4b5563; border-radius: 8px; font-size: 0.85rem;
-}
+.article-pill { font-size: 0.8rem; color: #6b7280; }
 
-/* H1 заголовок */
-.page-h1 { margin: 0 0 1.5rem; font-size: clamp(1.6rem, 2.6vw, 2.3rem); font-weight: 900; letter-spacing: -0.025em; color: #111827; line-height: 1.2; }
-
-/* Цена */
-.price-block {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 0.5rem;
-  padding: 0.25rem 0 0.5rem;
-  background: transparent;   /* ⭐ УБРАЛИ оранжевую плашку */
-  border-radius: 0;
-  border: none;              /* ⭐ УБРАЛИ рамку */
-}
-.price-main { 
-  font-size: clamp(2rem, 3.5vw, 3rem); 
-  font-weight: 900; 
-  color: #111827;            /* ⭐ Цена ЧЕРНАЯ, а не красная (если хотите красную — верните #b91c1c) */
-  letter-spacing: -0.03em; 
-  line-height: 1; 
-}
-.price-old { 
-  font-size: 1.2rem; 
-  text-decoration: line-through; 
-  color: #9ca3af; 
-  margin-top: -0.3rem;
+.price-block { display: flex; flex-direction: column; gap: 0.25rem; margin-top: 0.3rem; }
+.price-main { font-size: clamp(1.6rem, 3vw, 2rem); font-weight: 900; color: #111827; letter-spacing: -0.02em; line-height: 1; }
+.price-old {
+  color: #9ca3af;
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-decoration: line-through;
 }
 .discount-badge {
-  position: absolute; 
-  top: -8px; 
-  right: 0;
-  background: #dc2626; 
+  position: absolute;
+  background: #ef4444;
   color: #fff;
-  font-size: 0.88rem; 
-  font-weight: 800;
-  padding: 5px 12px; 
-  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  top: 1rem;
+  right: 1rem;
 }
-.price-vat-note {
-  width: 100%;
-  margin-top: 0.35rem;
-  padding-top: 0.5rem;
-  border-top: 1px solid #e5e7eb;   /* ⭐ ТОНКАЯ СЕРАЯ ЛИНИЯ */
-  font-size: 0.9rem;
-  font-weight: 600;
-  color: #374151;                 /* ⭐ ЧЕРНЫЙ текст */
-  line-height: 1.4;
-}
-.price-no-vat { 
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  margin-top: 0.3rem;
-  font-size: 0.78rem;
-  color: #6b7280;
-  font-weight: 500;
-}
+.info-card { position: relative; }
+.price-vat-note { color: #6b7280; font-size: 0.82rem; margin-top: 0.15rem; }
+.price-no-vat { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.3rem; font-size: 0.76rem; color: #9ca3af; }
 
 .btn-primary {
-  display: block;
-  width: 100%;
-  margin-top: 0.5rem;
-  padding: 1rem 1.25rem;
-  background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+  margin-top: 0.3rem;
+  background: #111827;
   color: #fff;
   border: none;
+  padding: 0.85rem 1.2rem;
+  font-size: 1rem;
+  font-weight: 700;
   border-radius: 10px;
   cursor: pointer;
-  font-size: 1.05rem;
-  font-weight: 700;
-  box-shadow: 0 4px 14px rgba(220,38,38,0.3);
-  transition: all 0.2s;
+  transition: background 0.15s, transform 0.15s;
 }
-.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 22px rgba(220,38,38,0.45); }
-.btn-sub { margin: -0.4rem 0 0; font-size: 0.8rem; color: #6b7280; text-align: center; }
+.btn-primary:hover { background: #030712; transform: translateY(-1px); }
+.btn-primary--full { width: 100%; }
+.btn-sub { margin: 0; color: #6b7280; font-size: 0.78rem; }
 
-.feature-list {
-  list-style: none; margin: 0.5rem 0 0; padding: 0.85rem 1rem;
-  background: #f9fafb; border-radius: 8px; border: 1px solid #e5e7eb;
-  display: flex; flex-direction: column; gap: 0.35rem;
+/* ==== BOTTOM SECTION ==== */
+.product-bottom { border-top: 1px solid #f1f5f9; padding-top: 1rem; }
+.bottom-section { margin: 2rem 0; padding-bottom: 1rem; }
+.h2-section {
+  font-size: clamp(1.25rem, 2vw, 1.5rem);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  margin: 0 0 1rem;
+  color: #111827;
 }
-.feature-list li { font-size: 0.88rem; color: #374151; }
 
-/* =========================== 2) НИЖНЯЯ ЧАСТЬ =========================== */
-.product-bottom { display: flex; flex-direction: column; gap: 2.5rem; }
-.bottom-section { width: 100%; }
-.h2-section { margin: 0 0 0.35rem; font-size: clamp(1.3rem, 2vw, 1.6rem); font-weight: 800; letter-spacing: -0.02em; color: #111827; }
-.sec-sub { margin: 0 0 1.25rem; color: #6b7280; font-size: 0.95rem; }
+.about-product p {
+  color: #374151;
+  line-height: 1.65;
+  margin: 0 0 0.85rem;
+  font-size: 0.98rem;
+}
+.about-wide .about-product { max-width: 100%; margin: 0 auto; text-align: center; }
+.about-wide .about-product p { text-align: center; }
 
-.about-product {
-  padding: 1.5rem 1.75rem;
+.chars-wrap {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  overflow: hidden;
+}
+.chars-narrow { max-width: 100%; width: 100%; }
+.chars-table { width: 100%; border-collapse: collapse; }
+.chars-table td {
+  padding: 0.65rem 1rem;
+  border-bottom: 1px solid #f1f5f9;
+  font-size: 0.92rem;
+  vertical-align: middle;
+}
+.chars-table tr:last-child td { border-bottom: none; }
+.ch-name { color: #6b7280; width: 38%; text-align: left; }
+.ch-value { color: #111827; text-align: left; }
+@media (max-width: 600px) {
+  .chars-table td { padding: 0.58rem 0.85rem; font-size: 0.86rem; }
+  .ch-name { width: 44%; }
+  .chars-narrow { max-width: 100%; }
+}
+
+/* =====⭐⭐⭐ БЛОК ПУБЛИЧНОЙ ОФЕРТЫ (СТ.435/437 ГК РФ) ===== */
+.offer-notice { padding-top: 0.5rem; }
+.offer-box {
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+  border-left: 4px solid #94a3b8;
+  border-radius: 10px;
+  padding: 1rem 1.25rem 1rem 3.2rem;
+  position: relative;
+}
+.offer-star {
+  position: absolute;
+  left: 1rem;
+  top: 0.85rem;
+  font-size: 2rem;
+  font-weight: 900;
+  color: #64748b;
+  line-height: 1;
+  margin: 0;
+}
+.offer-text {
+  margin: 0;
+  color: #475569;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  text-align: left;
+}
+.offer-text + .offer-text { margin-top: 0.5rem; }
+
+/* СОПУТСТВУЮЩИЕ */
+.grid-4col {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1.3rem;
+}
+@media (max-width: 1200px) { .grid-4col { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 760px)  { .grid-4col { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 420px)  { .grid-4col { grid-template-columns: 1fr; } }
+.grid--tall .rcard-img { aspect-ratio: 3 / 4; }
+
+.related-card {
   background: #fff;
   border: 1px solid #e5e7eb;
   border-radius: 12px;
-  color: #374151;
-  line-height: 1.65;
-}
-.about-product :global(p) { margin: 0.5rem 0; }
-.about-product :global(h3), .about-product :global(h4) { margin: 1.1rem 0 0.4rem; color: #111827; }
-.about-product :global(ul) { padding-left: 1.25rem; }
-.about-product :global(li) { margin: 0.2rem 0; }
-
-/* Характеристики */
-.chars-wrap { overflow: hidden; border-radius: 12px; border: 1px solid #e5e7eb; background: #fff; }
-.chars-table { width: 100%; border-collapse: collapse; }
-.chars-table tr { border-bottom: 1px solid #f3f4f6; }
-.chars-table tr:last-child { border-bottom: none; }
-.chars-table td { padding: 0.8rem 1.15rem; font-size: 0.94rem; vertical-align: top; }
-.ch-name { width: 55%; color: #6b7280; background: #fafafa; }
-.ch-value { color: #111827; }
-
-/* Сопутствующие */
-.related-scroll { overflow-x: auto; scroll-behavior: smooth; padding-bottom: 6px; }
-.related-inner { display: flex; gap: 1rem; }
-.related-card {
-  flex: 0 0 auto;
-  width: 230px;
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 10px;
   overflow: hidden;
   text-decoration: none;
   color: inherit;
-  display: flex; flex-direction: column;
-  transition: all 0.2s;
+  transition: transform 0.2s, box-shadow 0.2s;
+  display: flex;
+  flex-direction: column;
 }
-.related-card:hover { transform: translateY(-4px); box-shadow: 0 12px 28px rgba(0,0,0,0.12); border-color: #fcd34d; }
-.rel-img {
-  aspect-ratio: 4/3;
-  background: linear-gradient(135deg, #f8fafc 0%, #eef2f7 100%);
+.related-card:hover { transform: translateY(-3px); box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
+.rcard-img {
+  aspect-ratio: 4 / 3;
+  background: linear-gradient(135deg, #f8fafc, #eef2f7);
+  padding: 1rem;
   display: flex; align-items: center; justify-content: center;
-  padding: 0.75rem;
 }
-.rel-img :global(img), .rel-img img {
+.rcard-img img, .rcard-img :global(img) {
   max-width: 100%; max-height: 100%;
-  width: auto !important; height: auto !important;
-  object-fit: contain !important;
+  width: auto !important; height: auto !important; object-fit: contain;
 }
-.rel-body { padding: 0.75rem 0.9rem 1rem; display: flex; flex-direction: column; gap: 0.25rem; flex: 1; }
-.rel-cat { font-size: 0.7rem; text-transform: uppercase; color: #6b7280; font-weight: 600; letter-spacing: 0.05em; }
-.rel-title { font-size: 0.88rem; font-weight: 700; line-height: 1.3; color: #111827; min-height: 2.7em; }
-.rel-price { margin-top: auto; font-weight: 800; font-size: 1.05rem; color: #b91c1c; }
+.rcard-body { padding: 0.9rem 1rem 1.1rem; display: flex; flex-direction: column; gap: 0.35rem; }
+.rcard-body h4 { margin: 0; font-size: 0.88rem; line-height: 1.35; color: #111827; min-height: 2.7em; font-weight: 600; }
+.rcard-price { font-weight: 800; color: #111827; font-size: 1.05rem; }
+.rcard-price.no-price { color: #6b7280; font-weight: 500; font-size: 0.9rem; }
 
-/* ========= Модалка ========= */
-.modal { position: fixed; inset: 0; width: 100%; height: 100%; background: rgba(15,23,42,0.65); display: flex; align-items: center; justify-content: center; z-index: 2000; backdrop-filter: blur(2px); }
-.modal-content { background: #fff; padding: 1.75rem 1.75rem 1.5rem; border-radius: 14px; width: 90%; max-width: 460px; position: relative; box-shadow: 0 25px 60px rgba(0,0,0,0.4); animation: popin 0.2s ease-out; }
-@keyframes popin { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-.close { position: absolute; top: 12px; right: 16px; font-size: 1.75rem; cursor: pointer; color: #9ca3af; line-height: 1; }
-.close:hover { color: #111827; }
-.modal h2 { margin: 0 0 1.1rem; font-size: 1.25rem; font-weight: 800; }
-.modal h2 span { color: #b91c1c; }
-.modal input, .modal textarea {
-  width: 100%; margin-bottom: 0.8rem; padding: 0.8rem 0.95rem;
-  border: 1px solid #e5e7eb; border-radius: 8px; font-size: 0.95rem; box-sizing: border-box;
-  font-family: inherit; transition: border-color 0.15s;
+/* ==== MODAL ==== */
+.modal { position: fixed; inset: 0; z-index: 100; display: none; align-items: center; justify-content: center; padding: 1rem; }
+.modal[aria-hidden="false"] { display: flex; }
+.modal__overlay { position: absolute; inset: 0; background: rgba(17,24,39,0.55); backdrop-filter: blur(1px); }
+.modal__dialog { position: relative; background: #fff; border-radius: 14px; padding: 2rem; width: 100%; max-width: 440px; box-shadow: 0 20px 60px rgba(0,0,0,0.25); }
+.modal__close {
+  position: absolute; top: 0.5rem; right: 0.7rem; background: transparent; border: none;
+  font-size: 1.8rem; line-height: 1; color: #6b7280; cursor: pointer;
 }
-.modal input:focus, .modal textarea:focus { outline: none; border-color: #f59e0b; box-shadow: 0 0 0 3px #fef3c7; }
-.modal textarea { min-height: 88px; resize: vertical; }
-.modal .btn-primary { margin-top: 0.4rem; font-size: 1rem; padding: 0.9rem; }
-.form-law { margin: 0.6rem 0 0; font-size: 0.75rem; color: #9ca3af; text-align: center; }
+.modal__dialog h3 { margin: 0 0 0.25rem; font-weight: 800; color: #111827; font-size: 1.4rem; }
+.modal__subtitle { color: #6b7280; font-size: 0.88rem; margin: 0 0 1.2rem; line-height: 1.45; }
+.modal__form { display: flex; flex-direction: column; gap: 0.9rem; }
+.fld { display: flex; flex-direction: column; gap: 0.3rem; }
+.fld span { font-size: 0.82rem; font-weight: 600; color: #374151; }
+.fld input, .fld textarea {
+  font-family: inherit;
+  padding: 0.7rem 0.9rem;
+  border: 1px solid #d1d5db;
+  border-radius: 9px;
+  font-size: 0.95rem;
+  color: #111827;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.fld input:focus, .fld textarea:focus { border-color: #111827; box-shadow: 0 0 0 3px rgba(17,24,39,0.1); }
+.form-agree { margin: 0; font-size: 0.74rem; color: #6b7280; text-align: center; }
 </style>
 
 <script>
-/**
- * ⚠️ ВАНИЛЬНЫЙ JS — БЕЗ ЗАВИСИМОСТЕЙ
- * 1) Переключение большой картинки по клику на миниатюру
- * 2) Модалка заявки
- */
+/* ⚡ Vanilla JS — галерея thumbnails + modal */
 document.addEventListener('DOMContentLoaded', () => {
-
-  // ===== 1) Галерея: клик по миниатюре =====
-  const mainBox = document.getElementById('main-image-box');
-  const mainImg = document.getElementById('product-main-image');
-  const thumbs = document.querySelectorAll<HTMLButtonElement>('.thumb');
-  if (mainImg && thumbs.length > 0) {
-    // Запоминаем исходные атрибуты первого фото (srcset и т.д. для Image) — не нужно,
-    // т.к. Astro:assets отдает <img src="..." srcset="..." sizes="...">. Мы просто заменяем src/srcset.
-    const originals: { src: string | null; srcset: string | null; sizes: string | null; data: any }[] = [];
-    thumbs.forEach((btn) => {
-      const pic = btn.querySelector('img');
-      // Для картинки миниатюры astro:assets подставляет srcset тоже.
-      // Но нам нужен БОЛЬШОЙ вариант. В нашем случае один и тот же импорт — thumb и big используют одну и ту же исходную картинку,
-      // а Image генерирует свои srcset. Быстрее всего: вытащить src из thumb_img, заменить на /_astro/ большого аналога.
-      // АЛГОРИТМ: в data-main у главного img хранится исходный src. Миниатюра — содержит тот же путь,
-      // поэтому просто скопируем srcset главного с заменой aspect ratio не нужно — наш контейнер contain.
-      // ⭐ Самый простой и стабильный подход — ОБМЕН атрибутами:
-      originals.push({
-        src: pic?.getAttribute('src') || null,
-        srcset: pic?.getAttribute('srcset') || null,
-        sizes: pic?.getAttribute('sizes') || null,
-        data: pic
-      });
-
+  // --- Thumbnails ---
+  const wrap = document.getElementById('thumbsWrap') as HTMLDivElement | null;
+  const mainImg = document.getElementById('mainImage') as HTMLImageElement | null;
+  if (wrap && mainImg) {
+    wrap.querySelectorAll('.thumb-btn').forEach((btn) => {
       btn.addEventListener('click', () => {
-        const tImg = btn.querySelector('img');
-        if (!tImg || !mainImg) return;
-        // ✅ Просто копируем src + srcset + sizes с миниатюры (один и тот же asset).
-        // astro:assets сгенерировал для Image несколько размеров — они подойдут и как big.
-        const src = tImg.getAttribute('src');
-        const srcset = tImg.getAttribute('srcset');
-        const sizes = tImg.getAttribute('sizes');
-        if (src) mainImg.setAttribute('src', src);
-        if (srcset) mainImg.setAttribute('srcset', srcset);
-        if (sizes) mainImg.setAttribute('sizes', sizes);
-        mainImg.removeAttribute('width');
-        mainImg.removeAttribute('height');
-        // АКТИВНЫЙ СТИЛЬ
-        thumbs.forEach((b) => b.classList.remove('active'));
-        btn.classList.add('active');
+        const anyBtn = btn as any;
+        const idx = Number(anyBtn.dataset.idx || '0');
+        const allThumbs = wrap.querySelectorAll<HTMLButtonElement>('.thumb-btn');
+        const clickedBtn = allThumbs[idx];
+        if (!clickedBtn) return;
+        allThumbs.forEach(b => b.classList.remove('active'));
+        clickedBtn.classList.add('active');
+
+        const innerImg = clickedBtn.querySelector('img');
+        if (!innerImg) return;
+        // Копируем все src/sizes/data с thumb
+        for (const attr of ['src', 'srcset', 'sizes', 'alt', 'width', 'height']) {
+          const v = innerImg.getAttribute(attr);
+          if (v) mainImg.setAttribute(attr, v);
+        }
+        // Astro Image data attributes
+        for (const attr of innerImg.getAttributeNames()) {
+          if (attr.startsWith('data-')) {
+            const v = innerImg.getAttribute(attr);
+            if (v) mainImg.setAttribute(attr, v);
+          }
+        }
+        mainImg.removeAttribute('loading');
+        mainImg.style.opacity = '0.55';
+        setTimeout(() => { mainImg.style.opacity = ''; }, 80);
       });
     });
   }
 
-  // ===== 2) Модалка =====
-  const btn = document.getElementById('contact-btn');
-  const modal = document.getElementById('contact-modal');
-  const closeBtn = document.getElementById('modal-close');
-  const form = document.getElementById('contact-form');
-  if (btn && modal) {
-    const open = () => { modal.style.display = 'flex'; document.body.style.overflow = 'hidden'; };
-    const shut = () => { modal.style.display = 'none'; document.body.style.overflow = ''; };
-    btn.addEventListener('click', open);
-    closeBtn?.addEventListener('click', shut);
-    window.addEventListener('keydown', (e) => { if (e.key === 'Escape') shut(); });
-    modal.addEventListener('click', (e) => { if (e.target === modal) shut(); });
-    form?.addEventListener('submit', (e) => {
-      e.preventDefault();
-      // TODO: здесь подключить реальную отправку на почту / Telegram API / Formspree
-      alert('✅ Спасибо! Ваша заявка принята. Менеджер свяжется с вами в течение 15 минут.');
-      shut();
-    });
-  }
+  // --- Modal ---
+  const modal = document.getElementById('contactModal') as HTMLDivElement | null;
+  const openBtn = document.getElementById('contact-btn');
+  const shut = () => { if (modal) { modal.setAttribute('aria-hidden', 'true'); document.body.style.overflow = ''; } };
+  const open = () => { if (modal) { modal.setAttribute('aria-hidden', 'false'); document.body.style.overflow = 'hidden'; } };
+  if (openBtn) openBtn.addEventListener('click', open);
+  const form = document.getElementById('contactForm') as HTMLFormElement | null;
+  modal?.addEventListener('click', (e) => { if ((e.target as Element).hasAttribute('data-close')) shut(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') shut(); });
+  form?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    // TODO: здесь подключить реальную отправку на почту / Telegram API / Formspree
+    alert('Спасибо! Ваша заявка принята. Менеджер свяжется с вами в течение 15 минут.');
+    shut();
+  });
 });
 </script>

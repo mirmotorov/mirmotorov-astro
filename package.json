@@ -13,6 +13,7 @@
     "import": "tsx scripts/import-technique.ts"
   },
   "dependencies": {
+    "@astrojs/sitemap": "^3.7.4",
     "astro": "^7.1.3",
     "csv-parse": "^7.0.1",
     "sharp": "^0.35.3"

@@ -1,0 +1,75 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout title="Страница не найдена" description="Ошибка 404 — страница не найдена">
+  <div class="nf-wrap">
+    <div class="nf-inner">
+      <div class="nf-code">404</div>
+      <h1 class="nf-title">Страница не найдена</h1>
+      <p class="nf-sub">Такой страницы нет, или она была удалена.</p>
+      <a href="/" class="nf-btn">← Вернуться на главную</a>
+    </div>
+  </div>
+</Layout>
+
+<style>
+.nf-wrap {
+  min-height: 70vh;
+  background: #0f1423;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 1rem;
+  margin-top: 1rem;
+  border-radius: 12px;
+  max-width: 1400px;
+  margin-left: auto;
+  margin-right: auto;
+}
+.nf-inner {
+  text-align: center;
+  max-width: 600px;
+  width: 100%;
+}
+.nf-code {
+  font-size: clamp(5rem, 16vw, 10rem);
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.05em;
+  background: linear-gradient(135deg, #fde047 0%, #f59e0b 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  margin: 0 0 1rem;
+}
+.nf-title {
+  font-size: clamp(1.5rem, 3vw, 2.2rem);
+  font-weight: 800;
+  color: #fff;
+  margin: 0 0 0.8rem;
+}
+.nf-sub {
+  color: #9ca3af;
+  font-size: 1.05rem;
+  margin: 0 0 2.2rem;
+  line-height: 1.6;
+}
+.nf-btn {
+  display: inline-block;
+  background: #ED3333;
+  color: #ffffff;
+  text-decoration: none;
+  padding: 0.95rem 2.2rem;
+  border-radius: 10px;
+  font-weight: 800;
+  font-size: 1.05rem;
+  transition: transform 0.15s, box-shadow 0.15s, background 0.2s;
+}
+.nf-btn:hover {
+  background: #d62a2a;
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px rgba(237, 51, 51, 0.35);
+}
+</style>
