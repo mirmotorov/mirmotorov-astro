@@ -1,55 +1,77 @@
 name: Deploy Astro to GitHub Pages
 
 on:
-  # Запускаем вручную или при push в main
   push:
     branches: [main]
   workflow_dispatch:
 
-# Права для Pages и Actions нужны для деплоя в gh-pages
 permissions:
   contents: read
   pages: write
   id-token: write
 
-# Одновременные деплои только 1 за раз
 concurrency:
   group: pages
   cancel-in-progress: false
 
+env:
+  SHARP_FORCE_BUNDLE_LIBVIPS: "1"
+  SHARP_IGNORE_GLOBAL_LIBVIPS: "1"
+  NODE_OPTIONS: "--max-old-space-size=6144"
+
 jobs:
   build:
-    name: Сборка Astro SSG
+    name: Build Astro SSG
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout репозитория
+      - name: "1. Checkout репозитория"
         uses: actions/checkout@v4
 
-      - name: Установка Node.js 22
+      - name: "2. Информация об окружении (diagnostic)"
+        run: |
+          echo "OS: $(cat /etc/os-release | head -2)"
+          echo "RAM: $(free -h | grep Mem)"
+          node -v
+          npm -v
+          ls -la src/data src/data/technique 2>&1 | head -20
+
+      - name: "3. Установка Node.js 20 (LTS — 100% stable)"
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 20
           cache: npm
 
-      - name: Установка зависимостей
-        run: npm ci --engine-strict=false
+      - name: "4. Системные библиотеки для Sharp/libvips"
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libvips-dev build-essential pkg-config || true
 
-      - name: Сборка сайта (Astro SSG)
-        run: npm run build -- --site "https://mirmotorov.github.io/mirmotorov-astro"
+      - name: "5. Установка зависимостей (npm install вместо ci — надёжно!)"
+        run: npm install --engine-strict=false --no-audit --no-fund --prefer-offline
 
-      - name: Загрузка артефакта Pages
+      - name: "6. Сборка сайта Astro SSG"
+        run: npm run build
+
+      - name: "7. Проверка билда (diagnostic)"
+        run: |
+          ls -la dist | head -20
+          echo "Total pages: $(find dist -name '*.html' -type f | wc -l)"
+          echo "Check index.html:"
+          head -c 500 dist/index.html 2>&1 || echo "index not found"
+
+      - name: "8. Загрузка артефакта GitHub Pages"
         uses: actions/upload-pages-artifact@v3
         with:
           path: ./dist
 
   deploy:
-    name: Публикация на GitHub Pages
+    name: Deploy в GitHub Pages
     needs: build
     runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Публикация
+      - name: Deploy
         id: deployment
         uses: actions/deploy-pages@v4
