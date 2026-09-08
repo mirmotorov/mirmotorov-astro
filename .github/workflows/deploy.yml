@@ -25,10 +25,10 @@ jobs:
       - name: Checkout репозитория
         uses: actions/checkout@v4
 
-      - name: Установка Node.js 20
+      - name: Установка Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Установка зависимостей
