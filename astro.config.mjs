@@ -15,5 +15,12 @@ import { defineConfig } from 'astro/config';
 export default defineConfig({
   // integrations: [sitemap()],
   integrations: [],
+  // ⚠️ ВРЕМЕННО! Только для GitHub Pages домена mirmotorov.github.io/mirmotorov-astro/
+  // Astro ДОЛЖЕН добавлять '/mirmotorov-astro/' ВО ВСЕ ссылки на картинки/CSS/JS.
+  // ИНАЧЕ все src="/_astro/..." будут ОШИБОЧНО указывать на https://mirmotorov.github.io/_astro/... (без /mirmotorov-astro!)
+  // и браузер получит 404 HTML вместо картинки → сайт без стилей/изображений (только текст!).
+  // КОГДА ПЕРЕНОСИМ НА mirmotorov24.ru (кастомный домен, корень сайта) — ЗАКОММЕНТИРУЙТЕ base: ниже!
+  base: '/mirmotorov-astro/',
+  trailingSlash: 'ignore',
 });
 
